@@ -191,8 +191,8 @@ while( my $line = $vcf_fh->getline ) {
 # Prioritize snpEff effects, in the following generalized order:
 #  1. Truncating
 #  2. Missense
-#  3. 3'UTR
-#  4. 5'UTR
+#  3. 5'UTR
+#  4. 3'UTR
 #  5. Upstream
 #  6. Downstream
 #  7. Synonymous
@@ -220,10 +220,10 @@ sub GetEffectPriority {
         'CODON_CHANGE_PLUS_CODON_INSERTION' => 2,
         'CODON_DELETION' => 2,
         'CODON_CHANGE_PLUS_CODON_DELETION' => 2,
-        'UTR_3_PRIME' => 3,
-        'UTR_3_DELETED' => 3,
-        'UTR_5_PRIME' => 4,
-        'UTR_5_DELETED' => 4,
+        'UTR_5_PRIME' => 3,
+        'UTR_5_DELETED' => 3,
+        'UTR_3_PRIME' => 4,
+        'UTR_3_DELETED' => 4,
         'UPSTREAM' => 5,
         'DOWNSTREAM' => 6,
         'SYNONYMOUS_START' => 7,
