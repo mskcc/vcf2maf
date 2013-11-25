@@ -373,7 +373,9 @@ __DATA__
 
 =head1 DESCRIPTION
 
- Converting a VCF to MAF is rather subjective, and this script tries to follow best-practices.
+ To convert a VCF into a MAF, each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single affected transcript/isoform per variant, is often subjective. For now, we try to follow best-practices, but over time, the selection process will be made smarter and more configurable.
+
+ This script needs snpEff (snpeff.sourceforge.net), a variant annotator that can quickly map each variant to all possible transcripts in a database. snpEff is downloadable as a java archive, so make sure you also have Java installed.
 
 =head1 AUTHORS
 
@@ -382,6 +384,6 @@ __DATA__
 
 =head1 LICENSE
 
- LGPLv3 (Memorial Sloan-Kettering Cancer Center, New York, NY 10065, USA)
+ LGPLv3, Memorial Sloan-Kettering Cancer Center, New York, NY 10065, USA
 
 =cut
