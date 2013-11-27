@@ -82,32 +82,29 @@ while( my $line = $vcf_fh->getline ) {
     # Figure out the appropriate start/stop loci and var type/allele to report in the MAF
     my $start = my $stop = my $var = my $var_type = "";
     my ( $ref_length, $alt_length, $indel_size ) = ( length( $ref ), length( $alt ), 0 );
-    if( $info{VT} eq 'SNP' ) { # Handle SNPs
-        ( $start, $stop ) = ( $pos, $pos );
+    if( $ref_length == $alt_length ) { # Handle SNP, DNP, TNP, or ONP
+        ( $start, $stop ) = ( $pos, $pos + $alt_length - 1 );
         $var = $alt;
         $num_snvs++;
-        $var_type = "SNP";
+        my %np_type = qw( 1 SNP 2 DNP 3 TNP );
+        $var_type = ( $alt_length > 3 ? "ONP" : $np_type{$alt_length} );
     }
-    elsif( $info{VT} eq 'INDEL' && $ref_length < $alt_length ) { # Handle insertions
+    elsif( $ref_length < $alt_length ) { # Handle insertions
         $indel_size = length( $alt ) - $ref_length;
         ( $ref, $var ) = ( "-", substr( $alt, $ref_length, $indel_size ));
         ( $start, $stop ) = ( $pos, $pos + 1 );
         $num_indels++;
         $var_type = "INS";
     }
-    elsif( $info{VT} eq 'INDEL' && $ref_length > $alt_length ) { # Handle deletions
+    elsif( $ref_length > $alt_length ) { # Handle deletions
         $indel_size = length( $ref ) - $alt_length;
         ( $ref, $var ) = ( substr( $ref, $alt_length, $indel_size ), "-" );
         ( $start, $stop ) = ( $pos + 1, $pos + $indel_size );
         $num_indels++;
         $var_type = "DEL";
     }
-    elsif( $info{VT} eq 'SV' ) { # Skip SVs cuz we dunno annotate them
-        $num_svs++;
-        next;
-    }
     else { # Poop-out on unknown variant types
-        die "Unhandled variant type in VCF:\n$line\nPlease check/update your VCF parser!";
+        die "Unhandled variant type in VCF:\n$line\nPlease check/update this script!";
     }
 
     # Parse through each snpEff effect, which is stored in this format:
