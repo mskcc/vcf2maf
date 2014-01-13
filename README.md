@@ -35,9 +35,9 @@ Grep out the databases for humans:
 
     java -jar snpEff.jar databases | grep -i homo_sapiens
 
-Download and import the Ensembl v73 database for humans, and also the UCSC Known Genes database:
+Download and import the Ensembl v74 database for humans, and also the UCSC Known Genes database:
 
-    java -jar snpEff.jar download GRCh37.73
+    java -jar snpEff.jar download GRCh37.74
     java -jar snpEff.jar download hg19kg
 
 To test out snpEff, download and unzip VCFs from the NHLBI [Exome Sequencing Project](http://evs.gs.washington.edu/EVS/):
@@ -46,9 +46,9 @@ To test out snpEff, download and unzip VCFs from the NHLBI [Exome Sequencing Pro
     wget -P nhlbi_esp http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz
     tar -zxvf nhlbi_esp/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz -C nhlbi_esp
 
-Benchmark snpEff on the chr17 NHLBI ESP VCF with ~120K variants (Give it 2GB JVM heap size, use the Ensembl v73 database, and use HGVS output format for codon changes):
+Benchmark snpEff on the chr17 NHLBI ESP VCF with ~120K variants (Give it 2GB JVM heap size, use the Ensembl v74 database, and use HGVS output format for codon changes):
 
-    time java -Xmx2g -jar snpEff.jar eff -hgvs GRCh37.73 nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.vcf > nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.anno.vcf
+    time java -Xmx2g -jar snpEff.jar eff -hgvs GRCh37.74 nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.vcf > nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.anno.vcf
 
 It may report some warnings, but that's OK. The Ensembl transcript database is very comprehensive and lists many putative transcripts that need more curation. But our script will appropriately prioritize the "best" transcript to annotate each variant to.
 
