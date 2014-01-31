@@ -8,12 +8,12 @@ Quick start
 
 Download and unzip the latest script:
 
-    wget https://github.com/ckandoth/vcf2maf/archive/master.zip
+    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip
     unzip master.zip && rm -f master.zip
 
 View the detailed usage manual:
 
-    perl vcf2maf.pl --man
+    perl vcf2maf-master/vcf2maf.pl --man
 
 Install snpEff
 --------------
@@ -23,7 +23,7 @@ This script needs snpEff ([snpeff.sourceforge.net](http://snpeff.sourceforge.net
 Get to your home directory, and download snpEff's jar files and supporting scripts:
 
     cd ~/
-    wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
+    curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
     cd snpEff
 
@@ -42,9 +42,9 @@ Download and import the Ensembl v74 database for humans, and also the UCSC Known
 
 To test out snpEff, download and unzip VCFs from the NHLBI [Exome Sequencing Project](http://evs.gs.washington.edu/EVS/):
 
+    curl -LO http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz
     mkdir nhlbi_esp
-    wget -P nhlbi_esp http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz
-    tar -zxvf nhlbi_esp/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz -C nhlbi_esp
+    tar -zxvf ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz -C nhlbi_esp
 
 Benchmark snpEff on the chr17 NHLBI ESP VCF with ~120K variants (Give it 2GB JVM heap size, use the Ensembl v74 database, and use HGVS output format for codon changes):
 
