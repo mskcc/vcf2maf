@@ -6,14 +6,10 @@ To convert a VCF into a MAF, each variant must be annotated to only one of all p
 Quick start
 -----------
 
-Download and unzip the latest script:
+Download the script, and view the detailed usage manual:
 
-    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip
-    unzip master.zip && rm -f master.zip
-
-View the detailed usage manual:
-
-    perl vcf2maf-master/vcf2maf.pl --man
+    curl -LO https://raw2.github.com/ckandoth/vcf2maf/master/vcf2maf.pl
+    perl vcf2maf.pl --man
 
 Install snpEff
 --------------
