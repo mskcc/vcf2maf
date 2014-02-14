@@ -340,7 +340,7 @@ __DATA__
  perl vcf2maf.pl \
    --input-vcf WD1309_vs_NB1308.vcf --output-maf WD1309_vs_NB1308.maf \
    --tumor-id WD1309 --normal-id NB1308 \
-   --snpeff-cmd "java -Xmx2g -jar /srv/java/snpEff/snpEff.jar eff -cancer -lof -hgvs -config /srv/java/snpEff/snpEff.config -noStats GRCh37.74"
+   --snpeff-cmd "java -Xmx2g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74"
 
 =head1 OPTIONS
 
