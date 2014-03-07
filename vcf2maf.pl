@@ -77,7 +77,7 @@ while( my $line = $vcf_fh->getline ) {
     my ( $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line ) = split( /\t/, $line );
 
     # Parse out the data in the info column, and store into a hash
-    my %info = map {(m/=/ ? (split(/=/)) : ($_,1))} split( /\;/, $info_line );
+    my %info = map {(m/=/ ? (split(/=/,$_,2)) : ($_,1))} split( /\;/, $info_line );
 
     # Figure out the appropriate start/stop loci and var type/allele to report in the MAF
     my $start = my $stop = my $var = my $var_type = "";
@@ -326,7 +326,7 @@ sub GetVariantClassification {
 
     # All non-coding RNA genes are grouped into one classification
     my %ncrna_biotypes = map{($_,1)} qw( 3prime_overlapping_ncrna Mt_rRNA Mt_tRNA antisense lincRNA miRNA misc_RNA non_coding processed_transcript rRNA sense_intronic sense_overlapping snRNA snoRNA tRNA );
-    return "RNA" if( $ncrna_biotypes{${$ref_bestEffectDetails}[6]} );
+    return "RNA" if( defined $ncrna_biotypes{${$ref_bestEffectDetails}[6]} );
 
     # Annotate everything else simply as a targeted region
     return "Targeted_Region";
