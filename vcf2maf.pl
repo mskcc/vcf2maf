@@ -8,7 +8,7 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
-my $snpeff_cmd = "java -Xmx2g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74";
+my $snpeff_cmd = "java -Xmx4g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74";
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -326,7 +326,7 @@ sub GetVariantClassification {
 
     # All non-coding RNA genes are grouped into one classification
     my %ncrna_biotypes = map{($_,1)} qw( 3prime_overlapping_ncrna Mt_rRNA Mt_tRNA antisense lincRNA miRNA misc_RNA non_coding processed_transcript rRNA sense_intronic sense_overlapping snRNA snoRNA tRNA );
-    return "RNA" if( defined $ncrna_biotypes{${$ref_bestEffectDetails}[6]} );
+    return "RNA" if( defined ${$ref_bestEffectDetails}[6] and defined $ncrna_biotypes{${$ref_bestEffectDetails}[6]} );
 
     # Annotate everything else simply as a targeted region
     return "Targeted_Region";
@@ -355,7 +355,7 @@ __DATA__
  perl vcf2maf.pl \
    --input-vcf WD1309_vs_NB1308.vcf --output-maf WD1309_vs_NB1308.maf \
    --tumor-id WD1309 --normal-id NB1308 \
-   --snpeff-cmd "java -Xmx2g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74"
+   --snpeff-cmd "java -Xmx4g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74"
 
 =head1 OPTIONS
 
