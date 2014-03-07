@@ -66,7 +66,7 @@ my @mafHeader = qw(
 # Parse through each variant in the VCF, pull out the snpEff effects, and choose one isoform per
 # variant whose annotation will be used in the MAF
 my ( $num_snvs, $num_indels, $num_svs ) = ( 0, 0, 0 );
-$maf_fh->print( join( "\t", @mafHeader ), "\n" ); # Print MAF header
+$maf_fh->print( "#version 2.4\n" . join( "\t", @mafHeader ), "\n" ); # Print MAF header
 while( my $line = $vcf_fh->getline ) {
 
     # Skip all comment lines and the header cuz we know what we're doing!
@@ -187,17 +187,17 @@ while( my $line = $vcf_fh->getline ) {
 
 # Prioritize snpEff effects, in the following generalized order:
 #  1. Truncating
-#  2. Missense
+#  2. Missense/In-frame indels
 #  3. 5'UTR
 #  4. 3'UTR
 #  5. Upstream
 #  6. Downstream
 #  7. Synonymous
 #  8. Non-protein
-#  9. Intron - Conserved
-# 10. Intron
-# 11. Intergenic - Conserved
-# 12. Intergenic/intragenic
+#  9. Intron & Conserved/near a splice site
+# 10. Intron/intragenic
+# 11. Intergenic & Conserved
+# 12. Intergenic
 sub GetEffectPriority {
     my ($effect) = @_;
     my %effectPriority = (
@@ -231,9 +231,10 @@ sub GetEffectPriority {
         'TRANSCRIPT' => 8,
         'EXON' => 8,
         'INTRON_CONSERVED' => 9,
+        'SPLICE_SITE_REGION' => 9,
         'INTRON' => 10,
+        'INTRAGENIC' => 10,
         'INTERGENIC_CONSERVED' => 11,
-        'INTRAGENIC' => 12,
         'INTERGENIC' => 12
     );
     $effectPriority{$effect} or die "ERROR: Unrecognized effect \"$effect\". Please update your hashes!";
@@ -305,27 +306,27 @@ sub GetBiotypePriority {
 # Converts snpEff effect types to MAF variant classifications
 sub GetVariantClassification {
     my ( $effect, $ref_bestEffectDetails, $var_type ) = @_;
-    return "5'UTR" if( $effect =~ /UTR_5/ );
-    return "3'UTR" if( $effect =~ /UTR_3/ );
-    return "IGR" if( $effect =~ /INTERGENIC/ );
-    return "Intron" if ( $effect =~ /INTRON/ );
-    return "Splice_Site" if( $effect =~ /^SPLICE_SITE/ );
+    return "5'UTR" if( $effect =~ /^(UTR_5_PRIME|UTR_5_DELETED)$/ );
+    return "3'UTR" if( $effect =~ /^(UTR_3_PRIME|UTR_3_DELETED)$/ );
+    return "IGR" if( $effect =~ /^(INTERGENIC_CONSERVED|INTERGENIC)$/ );
+    return "Intron" if ( $effect =~ /^(INTRON_CONSERVED|SPLICE_SITE_REGION|INTRON|INTRAGENIC)$/ );
+    return "Splice_Site" if( $effect =~ /^(SPLICE_SITE_ACCEPTOR|SPLICE_SITE_DONOR|EXON_DELETED)$/ );
     return "5'Flank" if( $effect eq 'UPSTREAM' );
     return "3'Flank" if ( $effect eq 'DOWNSTREAM' );
-    return "Missense_Mutation" if( $effect eq 'NON_SYNONYMOUS_CODING' or $effect eq 'CODON_CHANGE' or $effect eq 'RARE_AMINO_ACID' );
+    return "Missense_Mutation" if( $effect =~ /^(NON_SYNONYMOUS_START|NON_SYNONYMOUS_CODING|CODON_CHANGE|RARE_AMINO_ACID)$/ );
     return "Translation_Start_Site" if( $effect eq 'START_LOST' );
     return "De_novo_Start_InFrame" if( $effect eq 'START_GAINED' );
     return "Nonsense_Mutation" if( $effect eq 'STOP_GAINED' );
     return "Nonstop_Mutation" if( $effect eq 'STOP_LOST' );
     return "Frame_Shift_Ins" if( $effect eq 'FRAME_SHIFT' and $var_type eq 'INS' );
     return "Frame_Shift_Del" if ( $effect eq 'FRAME_SHIFT' and $var_type eq 'DEL' );
-    return "In_Frame_Ins" if( $effect eq 'CODON_INSERTION' or $effect eq 'CODON_CHANGE_PLUS_CODON_INSERTION' );
-    return "In_Frame_Del" if( $effect eq 'CODON_DELETION' or $effect eq 'CODON_CHANGE_PLUS_CODON_DELETION' );
-    return "Silent" if( $effect =~ /^SYNONYMOUS_/ );
-    return "IGR" if( $effect eq 'INTRAGENIC' );
+    return "In_Frame_Ins" if( $effect =~ /^(CODON_INSERTION|CODON_CHANGE_PLUS_CODON_INSERTION)$/ );
+    return "In_Frame_Del" if( $effect =~ /^(CODON_DELETION|CODON_CHANGE_PLUS_CODON_DELETION)$/ );
+    return "Silent" if( $effect =~ /^(SYNONYMOUS_START|SYNONYMOUS_CODING|SYNONYMOUS_STOP|CDS)$/ );
 
     # All non-coding RNA genes are grouped into one classification
-    return "RNA" if( $effect eq 'EXON' and ${$ref_bestEffectDetails}[6]=~m/RNA/ and ${$ref_bestEffectDetails}[7]=~m/^NON_CODING$/ );
+    my %ncrna_biotypes = map{($_,1)} qw( 3prime_overlapping_ncrna Mt_rRNA Mt_tRNA antisense lincRNA miRNA misc_RNA non_coding processed_transcript rRNA sense_intronic sense_overlapping snRNA snoRNA tRNA );
+    return "RNA" if( $ncrna_biotypes{${$ref_bestEffectDetails}[6]} );
 
     # Annotate everything else simply as a targeted region
     return "Targeted_Region";
