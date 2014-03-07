@@ -8,8 +8,12 @@ Quick start
 
 Download the script, and view the detailed usage manual:
 
-    curl -LO https://raw2.github.com/ckandoth/vcf2maf/master/vcf2maf.pl
-    perl vcf2maf.pl --man
+    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip; unzip master.zip
+    perl vcf2maf-master/vcf2maf.pl --man
+
+If you don't already have snpEff, see the next section. And then test the script:
+
+    perl vcf2maf-master/vcf2maf.pl --input-vcf vcf2maf-master/test.vcf --output-maf vcf2maf-master/test.maf
 
 Install snpEff
 --------------

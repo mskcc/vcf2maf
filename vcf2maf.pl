@@ -9,6 +9,7 @@ use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
 my $snpeff_cmd = "java -Xmx4g -jar ~/snpEff/snpEff.jar eff -config ~/snpEff/snpEff.config -noStats -hgvs GRCh37.74";
+my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -17,7 +18,7 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
-my ( $input_vcf, $output_maf, $tumor_id, $normal_id );
+my ( $input_vcf, $output_maf );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
