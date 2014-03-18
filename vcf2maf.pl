@@ -172,6 +172,7 @@ while( my $line = $vcf_fh->getline ) {
                 $effect{BIOTYPE} = '' unless( $effect{BIOTYPE} );
                 $effect{Consequence} = '' unless( $effect{Consequence} );
                 $effect{CANONICAL} = '' unless( $effect{CANONICAL} );
+                $effect{SYMBOL} = '' unless( $effect{SYMBOL} );
 
                 # Remove transcript ID from HGVS codon/protein changes, to make it easier on the eye
                 $effect{HGVSc} =~ s/^.*:// if( $effect{HGVSc} );
@@ -195,9 +196,22 @@ while( my $line = $vcf_fh->getline ) {
             $b->{Transcript_Length} <=> $a->{Transcript_Length}
         } @all_effects;
 
-        # For the MAF, report the first effect in this sorted list which VEP tagged as canonical
-        ( $maf_effect ) = grep { $_->{CANONICAL} eq "YES" } @all_effects;
-        $maf_effect = $all_effects[0] unless( $maf_effect );
+        # For the MAF, we will report the effect on the canonical transcript of the first priority gene
+        my $maf_gene = $all_effects[0]->{SYMBOL};
+        if( $maf_gene and $maf_gene ne '' ) {
+            ( $maf_effect ) = grep { $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} eq "YES" } @all_effects;
+
+            # If that gene had no canonical transcript tagged, choose the longest transcript instead
+            unless( $maf_effect ) {
+                ( $maf_effect ) = sort { $b->{Transcript_Length} <=> $a->{Transcript_Length} } grep { $_->{SYMBOL} eq $maf_gene } @all_effects;
+            }
+        }
+        # If the top priority effect doesn't have a gene name, then use the first one that does
+        else {
+            ( $maf_effect ) = grep { defined $_->{SYMBOL} } @all_effects;
+            # If VEP still fails to provide any annotation, it's intergenic
+            $maf_effect->{Consequence} = "intergenic_variant" unless( $maf_effect->{Consequence} );
+        }
     }
 
     ### Parsing snpEff effects
@@ -243,9 +257,10 @@ while( my $line = $vcf_fh->getline ) {
         if( $maf_gene and $maf_gene ne '' ) {
             ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects;
         }
-        # If snpEff failed to provide any annotation, it's intergenic
+        # If the top priority effect doesn't have a gene name, then use the first one that does
         else {
-            $maf_effect = $all_effects[0];
+            ( $maf_effect ) = grep { defined $_->{Gene_Name} } @all_effects;
+            # If snpEff still fails to provide any annotation, it's intergenic
             $maf_effect->{Effect} = "intergenic_variant" unless( $maf_effect->{Effect} );
         }
     }
