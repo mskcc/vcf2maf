@@ -1,64 +1,82 @@
 vcf2maf
 =======
 
-To convert a VCF into a MAF, each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single affected transcript/isoform per variant, is often subjective. For now, we try to follow best-practices, but over time, the selection process will be made smarter and more configurable.
+To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean toward best practices.
 
 Quick start
 -----------
 
-Download the script, and view the detailed usage manual:
+Download the latest release, and view the detailed usage manual:
 
-    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip; unzip master.zip
-    perl vcf2maf-master/vcf2maf.pl --man
+    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip; unzip master.zip; cd vcf2maf-master
+    perl vcf2maf.pl --man
 
-If you don't already have snpEff, see the next section. And then test the script:
+To download properly versioned releases, [click here](https://github.com/ckandoth/vcf2maf/releases) for a list.
 
-    perl vcf2maf-master/vcf2maf.pl --input-vcf vcf2maf-master/test.vcf --output-maf vcf2maf-master/test.maf
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, follow the sections below. VEP is preferred for it's CLIA-compliant HGVS format, and is used by default. So after installing VEP following the section below, you can test the script on the provided `test.vcf`:
+
+    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf
+
+If you had VEP installed in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+
+    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --vep-path /opt/vep --vep-data /srv/vep
+
+If you'd rather run snpEff, which runs much faster than VEP, there's an option for that:
+
+    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.snpeff.maf --use-snpeff
+
+If you already annotated a VCF with either VEP or snpEff, you can use those directly:
+
+    perl vcf2maf.pl --input-vep test.vep.vcf --output-maf test.maf
+    perl vcf2maf.pl --input-snpeff test.snpeff.vcf --output-maf test.maf
+
+Install VEP
+-----------
+
+Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/tools/vep/index.html)) is popular for how it selects a single "canonical transcript" per gene as [detailed here](http://useast.ensembl.org/Help/Glossary?id=346), its CLIA-compliant [HGVS variant format](http://www.hgvs.org/mutnomen/recs.html), and [Sequence Ontology nomenclature](http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences) for variant effects. It's download-able as a Perl script, so make sure you have [Perl installed](http://www.perl.org/get.html).
+
+Download the latest release of VEP into your home directory:
+
+    cd ~/
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/75.tar.gz
+    tar -zxf 75.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|vep/|g'
+    cd vep
+
+Import the Ensembl v75 (Gencode v19) database for humans:
+
+    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens_vep --VERSION 75
+
+Test running VEP in offline mode with 4 parallel threads, on the provided example VCF:
+
+    perl variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --fasta ~/.vep --input_file example.vcf --output_file example.vep.txt
 
 Install snpEff
 --------------
 
-This script needs snpEff ([snpeff.sourceforge.net](http://snpeff.sourceforge.net/)), a variant annotator that can quickly map each variant to all possible transcripts in a database. It also includes a downloader/importer for thousands of popular transcript databases like from Ensembl and UCSC. snpEff is downloadable as a java archive, so make sure you also have Java installed.
+snpEff ([snpeff.sourceforge.net](http://snpeff.sourceforge.net/)) is popular because of its portability and speed at mapping effects on all possible transcripts in a database like [Ensembl](http://useast.ensembl.org/Homo_sapiens/Info/Annotation) or [Refseq](http://www.ncbi.nlm.nih.gov/refseq/). It's download-able as a java archive, so make sure you have [Java installed](https://www.java.com/en/download/help/download_options.xml).
 
-Get to your home directory, and download snpEff's jar files and supporting scripts:
+Download the latest release of snpEff into your home directory:
 
     cd ~/
     curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
     cd snpEff
 
-There are over 2500 pre-indexed transcript databases available through snpEff (different species/references/versions). They can be listed out as follows:
+Import the Ensembl v75 (Gencode v19) database for humans:
 
-    java -jar snpEff.jar databases
+    java -Xmx4g -jar snpEff.jar download GRCh37.75
 
-Grep out the databases for humans:
+Test running snpEff on a sample VCF:
 
-    java -jar snpEff.jar databases | grep -i homo_sapiens
-
-Download and import the Ensembl v74 database for humans, and also the UCSC Known Genes database:
-
-    java -jar snpEff.jar download GRCh37.74
-    java -jar snpEff.jar download hg19kg
-
-To test out snpEff, download and unzip VCFs from the NHLBI [Exome Sequencing Project](http://evs.gs.washington.edu/EVS/):
-
-    curl -LO http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz
-    mkdir nhlbi_esp
-    tar -zxvf ESP6500SI-V2-SSA137.dbSNP138-rsIDs.snps_indels.vcf.tar.gz -C nhlbi_esp
-
-Benchmark snpEff on the chr17 NHLBI ESP VCF with ~120K variants (Give it 2GB JVM heap size, use the Ensembl v74 database, and use HGVS output format for codon changes):
-
-    time java -Xmx2g -jar snpEff.jar eff -hgvs GRCh37.74 nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.vcf > nhlbi_esp/ESP6500SI-V2-SSA137.updatedRsIds.chr17.snps_indels.anno.vcf
-
-It may report some warnings, but that's OK. The Ensembl transcript database is very comprehensive and lists many putative transcripts that need more curation. But our script will appropriately prioritize the "best" transcript to annotate each variant to.
+    java -Xmx4g -jar snpEff.jar eff -noStats -sequenceOntolgy -hgvs GRCh37.75 example.vcf > example.snpeff.vcf
 
 Authors
 -------
 
     Cyriac Kandoth (ckandoth@gmail.com)
-    William Lee (leew1@cbio.mskcc.org)
+    William Lee, Senior Research Scientist, Memorial Sloan Kettering Cancer Center
 
 License
 -------
 
-    LGPLv3, Memorial Sloan-Kettering Cancer Center, New York, NY 10065, USA
+    LGPLv3, Memorial Sloan Kettering Cancer Center, New York, NY 10065, USA
