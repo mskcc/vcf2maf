@@ -9,22 +9,22 @@ To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wi
 Quick start
 -----------
 
-Download the latest release, and view the detailed usage manual:
+Download the latest release of vcf2maf, and view the detailed usage manual:
 
     curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip; unzip master.zip; cd vcf2maf-master
     perl vcf2maf.pl --man
 
 To download properly versioned releases, [click here](https://github.com/ckandoth/vcf2maf/releases) for a list.
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, follow the sections below. VEP is preferred for it's CLIA-compliant HGVS format, and is used by default. So after installing VEP following the section below, you can test the script on the provided `test.vcf`:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, see the sections below. VEP is preferred for it's CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html), and is used by default. So after installing VEP, you can test the script on the provided `test.vcf`:
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf
 
-If you had VEP installed in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+If you have VEP installed in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --vep-path /opt/vep --vep-data /srv/vep
 
-If you'd rather run snpEff, which runs much faster than VEP, there's an option for that:
+If you'd rather use snpEff, which runs much faster than VEP, there's an option for that:
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.snpeff.maf --use-snpeff
 
@@ -38,14 +38,14 @@ Install VEP
 
 Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/tools/vep/index.html)) is popular for how it selects a single "canonical transcript" per gene as [detailed here](http://useast.ensembl.org/Help/Glossary?id=346), its CLIA-compliant [HGVS variant format](http://www.hgvs.org/mutnomen/recs.html), and [Sequence Ontology nomenclature](http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences) for variant effects. It's download-able as a Perl script, so make sure you have [Perl installed](http://www.perl.org/get.html).
 
-Download the latest release of VEP into your home directory:
+Download the v75 release of VEP into your home directory:
 
     cd ~/
     curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/75.tar.gz
     tar -zxf 75.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|vep/|g'
     cd vep
 
-Import the Ensembl v75 (Gencode v19) database for humans:
+Import the Ensembl v75 (Gencode v19) database for humans (writes to `~/.vep` by default):
 
     perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens_vep --VERSION 75
 
@@ -65,7 +65,7 @@ Download the latest release of snpEff into your home directory:
     unzip snpEff_latest_core.zip
     cd snpEff
 
-Import the Ensembl v75 (Gencode v19) database for humans:
+Import the Ensembl v75 (Gencode v19) database for humans (writes to `snpEff/data` by default):
 
     java -Xmx4g -jar snpEff.jar download GRCh37.75
 
