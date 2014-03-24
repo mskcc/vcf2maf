@@ -20,7 +20,7 @@ If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf
 
-If you have VEP installed in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --vep-path /opt/vep --vep-data /srv/vep
 
@@ -28,7 +28,7 @@ If you'd rather use snpEff, which runs much faster than VEP, there's an option f
 
     perl vcf2maf.pl --input-vcf test.vcf --output-maf test.snpeff.maf --use-snpeff
 
-If you already annotated a VCF with either VEP or snpEff, you can use those directly:
+If you already have a VCF annotated with either VEP or snpEff, you can use those directly:
 
     perl vcf2maf.pl --input-vep test.vep.vcf --output-maf test.maf
     perl vcf2maf.pl --input-snpeff test.snpeff.vcf --output-maf test.maf

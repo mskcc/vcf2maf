@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 use IO::File;
-use File::Temp qw( tempfile tempdir );
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
@@ -21,6 +20,7 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help, $use_snpeff ) = ( 0, 0, 0 );
 my ( $input_vcf, $vep_anno, $snpeff_anno, $output_maf );
+my ( $var_sample_id, $nrm_sample_id );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -31,6 +31,8 @@ GetOptions(
     'output-maf=s' => \$output_maf,
     'tumor-id=s' => \$tumor_id,
     'normal-id=s' => \$normal_id,
+    'var-sample-id=s' => \$var_sample_id,
+    'nrm-sample-id=s' => \$nrm_sample_id,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'snpeff-path=s' => \$snpeff_path,
@@ -46,6 +48,10 @@ if(( $input_vcf and $vep_anno ) or ( $input_vcf and $snpeff_anno ) or ( $vep_ann
 elsif( $use_snpeff and ( $vep_anno or $snpeff_anno )) {
     die "The use-snpeff option can only be used with input-vcf\n";
 }
+
+# Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
+$var_sample_id = $tumor_id unless( $var_sample_id );
+$nrm_sample_id = $normal_id unless( $nrm_sample_id );
 
 # Annotate variants in given VCF to all possible transcripts, unless an annotated VCF was provided
 if( $vep_anno ) {
@@ -86,7 +92,7 @@ else {
     die "Please specify an input file: input-vcf, input-vep, or input-snpeff. STDIN is not supported.\n";
 }
 
-# Define default columns for the MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ)
+# Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
 my @maf_header = qw(
     Hugo_Symbol Entrez_Gene_Id Center NCBI_Build Chromosome Start_Position End_Position Strand
     Variant_Classification Variant_Type Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2
@@ -95,6 +101,7 @@ my @maf_header = qw(
     Match_Norm_Validation_Allele1 Match_Norm_Validation_Allele2 Verification_Status Validation_Status
     Mutation_Status Sequencing_Phase Sequence_Source Validation_Method Score BAM_File Sequencer
     Tumor_Sample_UUID Matched_Norm_Sample_UUID HGVSc HGVSp Transcript_ID Exon_Number
+    t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count
 );
 
 # Add extra columns to the MAF depending on whether we used VEP or snpEff
@@ -109,46 +116,74 @@ my $vcf_fh = IO::File->new( $vcf_file ) or die "Couldn't open annotated VCF: $vc
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "Couldn't open output file: $output_maf! $!" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
+my ( $var_sample_idx, $nrm_sample_idx );
 while( my $line = $vcf_fh->getline ) {
 
-    # Skip all comment lines and the header cuz we know what we're doing!
-    next if( $line =~ m/^#/ );
+    # Skip all VCF header descriptions cuz we're l33t!
+    next if( $line =~ m/^##/ );
 
-    # We don't need any of the data from the formatted columns. Fetch everything else
     chomp( $line );
-    my ( $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line ) = split( /\t/, $line );
+    my ( $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, @rest ) = split( /\t/, $line );
+
+    # If FORMATted genotype fields are available, find the sample with the variant, and matched normal
+    if( $line =~ m/^#CHROM/ ) {
+        if( $format_line and scalar( @rest ) > 0 ) {
+            for( my $i = 0; $i <= $#rest; ++$i ) {
+                $var_sample_idx = $i if( $rest[$i] eq $var_sample_id );
+                $nrm_sample_idx = $i if( $rest[$i] eq $nrm_sample_id );
+            }
+            ( defined $var_sample_idx ) or die "No genotypes for $var_sample_id in VCF!\n";
+        }
+        next;
+    }
 
     # Parse out the data in the info column, and store into a hash
-    my %info = map {(m/=/ ? (split(/=/,$_,2)) : ($_,1))} split( /\;/, $info_line );
+    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, 1 ))} split( /\;/, $info_line );
 
-    # If there are multiple ALT alleles, follow the convention of choosing the first one listed
-    # ::TODO:: It might be wiser to choose the one with the higher allele fraction/frequency
-    my $alt_allele_num = 1;
-    my @alts = split( /,/, $alt );
-    my ( $var ) = $alts[$alt_allele_num-1];
+    # If there are multiple ALT alleles, choose the one with the most supporting reads
+    # Or if allelic depths are unavailable, choose the first one listed under ALT
+    my @alleles = ( $ref, split( /,/, $alt ));
+    my $alt_allele_idx = 1;
+    my ( %var_sample_info, %nrm_sample_info );
+    if( $format_line and scalar( @rest ) > 0 ) {
+
+        # Load into a hash, the FORMATted genotype info for the sample containing the variant
+        my @format_keys = split( /\:/, $format_line );
+        my ( $t_idx, $n_idx ) = ( 0, 0 );
+        %var_sample_info = map {( $format_keys[$t_idx++], $_ )} split( /\:/, $rest[$var_sample_idx] );
+        %nrm_sample_info = map {( $format_keys[$n_idx++], $_ )} split( /\:/, $rest[$nrm_sample_idx] ) if( defined $nrm_sample_idx );
+        if( defined $var_sample_info{AD} ) {
+            my @allelic_depth = split( /,/, $var_sample_info{AD} );
+            # The first depth listed belongs to the reference allele. Of the rest, find the largest
+            for( my $i = 1; $i <= $#allelic_depth; ++$i ) {
+                $alt_allele_idx = $i if( $allelic_depth[$i] > $allelic_depth[$alt_allele_idx] );
+            }
+        }
+    }
+    my ( $var ) = $alleles[$alt_allele_idx];
 
     # Figure out the appropriate start/stop loci and var type/allele to report in the MAF
     my $start = my $stop = my $var_type = "";
-    my ( $ref_length, $var_length, $indel_size ) = ( length( $ref ), length( $var ), 0 );
-    if( $ref_length == $var_length ) { # Handle SNP, DNP, TNP, or ONP
+    my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
+    # Handle SNP, DNP, TNP, or ONP
+    if( $ref_length == $var_length ) {
         ( $start, $stop ) = ( $pos, $pos + $var_length - 1 );
         my %np_type = qw( 1 SNP 2 DNP 3 TNP );
         $var_type = ( $var_length > 3 ? "ONP" : $np_type{$var_length} );
     }
-    elsif( $ref_length < $var_length ) { # Handle insertions
-        $indel_size = length( $var ) - $ref_length;
-        ( $ref, $var ) = ( "-", substr( $var, $ref_length, $indel_size ));
-        ( $start, $stop ) = ( $pos, $pos + 1 );
-        $var_type = "INS";
-    }
-    elsif( $ref_length > $var_length ) { # Handle deletions
-        $indel_size = length( $ref ) - $var_length;
-        ( $ref, $var ) = ( substr( $ref, $var_length, $indel_size ), "-" );
-        ( $start, $stop ) = ( $pos + 1, $pos + $indel_size );
-        $var_type = "DEL";
-    }
-    else { # Poop-out on unknown variant types
-        die "Unhandled variant type in VCF:\n$line\nPlease check/update this script!";
+    # If this is an indel, we need to remove the prefixed reference bp from all alleles
+    elsif( $ref_length != $var_length ) {
+        ( $ref, $var, @alleles ) = map{substr( $_, 1 )} ( $ref, $var, @alleles );
+        $ref = "-" unless( $ref );
+        $var = "-" unless( $var );
+        if( $ref_length < $var_length ) { # Handle insertions
+            ( $start, $stop ) = ( $pos, $pos + 1 );
+            $var_type = "INS";
+        }
+        else { # Handle deletions
+            ( $start, $stop ) = ( $pos + 1, $pos + $ref_length - $var_length );
+            $var_type = "DEL";
+        }
     }
 
     my @all_effects = (); # A list of all effects per variant that can be reported in extra MAF columns
@@ -166,7 +201,7 @@ while( my $line = $vcf_fh->getline ) {
             my %effect = map{s/\&/,/g; ( $vepcsq_cols[$idx++], $_ )} split( /\|/, $csq_line );
 
             # Skip effects on other ALT alleles
-            if( $effect{ALLELE_NUM} == $alt_allele_num ) {
+            if( $effect{ALLELE_NUM} == $alt_allele_idx ) {
 
                 # Fix potential warnings about undefined variables
                 $effect{BIOTYPE} = '' unless( $effect{BIOTYPE} );
@@ -227,7 +262,7 @@ while( my $line = $vcf_fh->getline ) {
                 my %effect = map{( $snpeff_cols[$idx++], $_ )} ( $1, split( /\|/, $2 ));
 
                 # Skip transcripts with errors/warnings, or effects on other ALT alleles
-                unless( $effect{ERRORS} or $effect{WARNINGS} or $effect{Genotype_Number} != $alt_allele_num ) {
+                unless( $effect{ERRORS} or $effect{WARNINGS} or $effect{Genotype_Number} != $alt_allele_idx ) {
 
                     # Fix potential warnings about undefined variables
                     $effect{Transcript_BioType} = '' unless( $effect{Transcript_BioType} );
@@ -279,7 +314,13 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type);
     $maf_line{Variant_Type} = $var_type;
     $maf_line{Reference_Allele} = $ref;
-    $maf_line{Tumor_Seq_Allele1} = $var;
+    # If the genotypes are unavailable, then we'll assume it's ref/var heterozygous
+    $maf_line{Tumor_Seq_Allele1} = $ref;
+    if( defined $var_sample_info{GT} and $var_sample_info{GT} ne "." ) {
+        # ::NOTE:: MAF format doesn't support triallelic genotypes. So break it down as necessary
+        my ( $idx1, $idx2 ) = split( /\//, $var_sample_info{GT} );
+        $maf_line{Tumor_Seq_Allele1} = ( $alleles[$idx1] eq $var ? $alleles[$idx2] : $alleles[$idx1] );
+    }
     $maf_line{Tumor_Seq_Allele2} = $var;
     $maf_line{dbSNP_RS} = GetrsIDs( $ids );
     $maf_line{Tumor_Sample_Barcode} = $tumor_id;
@@ -288,6 +329,10 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{HGVSp} = ( $maf_effect->{HGVSp} ? $maf_effect->{HGVSp} : '' );
     $maf_line{Transcript_ID} = ( $maf_effect->{RefSeq} ? $maf_effect->{RefSeq} : ( $maf_effect->{Transcript_ID} ? $maf_effect->{Transcript_ID} : '' ));
     $maf_line{Exon_Number} = ( $maf_effect->{EXON} ? $maf_effect->{EXON} : ( $maf_effect->{Exon_Rank} ? $maf_effect->{Exon_Rank} : '' ));
+    $maf_line{t_depth} = $var_sample_info{DP} if( defined $var_sample_info{DP} );
+    ( $maf_line{t_ref_count}, $maf_line{t_alt_count} ) = split( /,/, $var_sample_info{AD} ) if( defined $var_sample_info{AD} );
+    $maf_line{n_depth} = $nrm_sample_info{DP} if( defined $nrm_sample_info{DP} );
+    ( $maf_line{n_ref_count}, $maf_line{n_alt_count} ) = split( /,/, $nrm_sample_info{AD} ) if( defined $nrm_sample_info{AD} );
 
     foreach my $col ( @maf_header ) {
         $maf_fh->print( "\t" ) if ( $col ne $maf_header[0] );
@@ -492,6 +537,14 @@ __DATA__
 =item B<--normal-id>
 
  The normal sample ID to report in the 17th column of the MAF [NORMAL]
+
+=item B<--var-sample-id>
+
+ The ID of the sample containing the variant, as used in the VCF header [--tumor-id]
+
+=item B<--nrm-sample-id>
+
+ The ID of the matched normal sample as used in the VCF header [--normal-id]
 
 =item B<--use-snpeff>
 

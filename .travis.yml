@@ -1,4 +1,4 @@
-# Reference: http://docs.travis-ci.com/user/build-configuration/
+# Reference: http://docs.travis-ci.com/user/languages/perl/
 language: perl
 perl:
   - "5.18"
