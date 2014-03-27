@@ -162,26 +162,26 @@ while( my $line = $vcf_fh->getline ) {
     }
     my ( $var ) = $alleles[$alt_allele_idx];
 
-    # Figure out the appropriate start/stop loci and var type/allele to report in the MAF
+    # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
     my $start = my $stop = my $var_type = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
-    # Handle SNP, DNP, TNP, or ONP
+    # Handle SNPs, DNPs, TNPs, or anything larger (ONP)
     if( $ref_length == $var_length ) {
         ( $start, $stop ) = ( $pos, $pos + $var_length - 1 );
         my %np_type = qw( 1 SNP 2 DNP 3 TNP );
         $var_type = ( $var_length > 3 ? "ONP" : $np_type{$var_length} );
     }
-    # If this is an indel, we need to remove the prefixed reference bp from all alleles
+    # Handle all indels, including those complex ones which contain substitutions
     elsif( $ref_length != $var_length ) {
-        ( $ref, $var, @alleles ) = map{substr( $_, 1 )} ( $ref, $var, @alleles );
-        $ref = "-" unless( $ref );
-        $var = "-" unless( $var );
-        if( $ref_length < $var_length ) { # Handle insertions
-            ( $start, $stop ) = ( $pos, $pos + 1 );
+        # Remove the prefixed reference bp from all alleles, using "-" for simple indels
+        ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
+        --$ref_length; --$var_length;
+        if( $ref_length < $var_length ) { # Handle insertions, and the special case for complex ones
+            ( $start, $stop ) = ( $pos, ( $ref eq "-" ? $pos + 1 : $pos + $ref_length ));
             $var_type = "INS";
         }
         else { # Handle deletions
-            ( $start, $stop ) = ( $pos + 1, $pos + $ref_length - $var_length );
+            ( $start, $stop ) = ( $pos + 1, $pos + $ref_length );
             $var_type = "DEL";
         }
     }
