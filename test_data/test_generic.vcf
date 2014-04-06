@@ -1,7 +1,7 @@
 ##fileformat=VCFv4.2
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype"
-##FORMAT=<ID=AD,Number=G,Type=Integer,Description="AllelicDepthsofREFandALT(s)intheorderlisted">
-##FORMAT=<ID=DP,Number=1,Type=Integer,Description="ReadDepth">
+##FORMAT=<ID=AD,Number=G,Type=Integer,Description="Allelic Depths of REF and ALT(s) in the order listed">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	TUMOR	NORMAL
 1	11290178	.	TA	T	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:30,5:35
 1	15557977	.	TG	CA	.	.	.	GT:AD:DP	0/1:11,5:16	0/0:21,1:22
