@@ -378,6 +378,7 @@ sub GetEffectPriority {
         'NMD_transcript_variant' => 15, # A variant in a transcript that is the target of NMD
         'upstream_gene_variant' => 16, # A sequence variant located 5' of a gene
         'downstream_gene_variant' => 16, # A sequence variant located 3' of a gene
+        'downstream_variant' => 16, # A sequence variant located 3' of a gene (default length: 5kb)
         'TFBS_ablation' => 17, # A feature ablation whereby the deleted region includes a transcription factor binding site
         'TFBS_amplification' => 17, # A feature amplification of a region containing a transcription factor binding site
         'TF_binding_site_variant' => 17, # A sequence variant located within a transcription factor binding site
@@ -478,6 +479,7 @@ sub GetVariantClassification {
     return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|intergenic_variant)$/ );
     return "5'Flank" if( $effect eq 'upstream_gene_variant' );
     return "3'Flank" if ( $effect eq 'downstream_gene_variant' );
+    return "3'Flank" if ( $effect eq 'downstream_variant' );
 
     # Annotate everything else simply as a targeted region
     # TFBS_ablation, TFBS_amplification,regulatory_region_ablation, regulatory_region_amplification,
