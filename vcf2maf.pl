@@ -73,7 +73,7 @@ elsif( $input_vcf ) {
         print STDERR "Running snpEff on VCF, and writing output to: $snpeff_anno\n";
 
         # Make sure we can find the snpEff jar file and config
-        unless( -e "$snpeff_path/snpEff.jar" and -e "$snpeff_path/snpEff.config" ) {
+        unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
             die "Cannot find snpEff jar or config in path: $snpeff_path";
         }
 
@@ -86,6 +86,11 @@ elsif( $input_vcf ) {
         $vep_anno = $input_vcf;
         $vep_anno =~ s/(\.vcf)*$/.vep.vcf/;
         print STDERR "Running VEP on VCF, and writing output to: $vep_anno\n";
+
+        # Make sure we can find the VEP script
+        unless( glob "$vep_path/variant_effect_predictor.pl" ) {
+            die "Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
+        }
 
         # Contruct VEP command using our chosen defaults and run it
         my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
