@@ -7,10 +7,10 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
-my ( $vep_path, $snpeff_path ) = ( "~/vep", "~/snpEff" );
-my ( $vep_data, $snpeff_data ) = ( "~/.vep", "~/snpEff/data" );
+my ( $vep_path, $vep_data ) = ( "~/vep", "~/.vep" );
+my ( $snpeff_path, $snpeff_data ) = ( "~/snpEff", "~/snpEff/data" );
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $ncbi_build, $maf_center ) = ( 37, "." );
+my ( $ncbi_build, $maf_center ) = ( 37, "mskcc.org" );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -20,7 +20,7 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help, $use_snpeff ) = ( 0, 0, 0 );
 my ( $input_vcf, $vep_anno, $snpeff_anno, $output_maf );
-my ( $var_sample_id, $nrm_sample_id );
+my ( $vcf_tumor_id, $vcf_normal_id );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -31,8 +31,8 @@ GetOptions(
     'output-maf=s' => \$output_maf,
     'tumor-id=s' => \$tumor_id,
     'normal-id=s' => \$normal_id,
-    'var-sample-id=s' => \$var_sample_id,
-    'nrm-sample-id=s' => \$nrm_sample_id,
+    'vcf-tumor-id=s' => \$vcf_tumor_id,
+    'vcf-normal-id=s' => \$vcf_normal_id,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'snpeff-path=s' => \$snpeff_path,
@@ -50,27 +50,32 @@ elsif( $use_snpeff and ( $vep_anno or $snpeff_anno )) {
 }
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
-$var_sample_id = $tumor_id unless( $var_sample_id );
-$nrm_sample_id = $normal_id unless( $nrm_sample_id );
+$vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
+$vcf_normal_id = $normal_id unless( $vcf_normal_id );
 
 # Annotate variants in given VCF to all possible transcripts, unless an annotated VCF was provided
 if( $vep_anno ) {
     ( -s $vep_anno ) or die "Provided VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
-    ( $vep_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported.\n";
+    ( $vep_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
 }
 elsif( $snpeff_anno ) {
     ( -s $snpeff_anno ) or die "Provided snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
-    ( $snpeff_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported.\n";
+    ( $snpeff_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
 }
 elsif( $input_vcf ) {
     ( -s $input_vcf ) or die "Provided VCF file is missing or empty!\nPath: $input_vcf\n";
-    ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported.\n";
+    ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
 
     # Run snpEff if user specifically asks for it. Otherwise, run VEP by default
     if( $use_snpeff ) {
         $snpeff_anno = $input_vcf;
         $snpeff_anno =~ s/(\.vcf)*$/.snpeff.vcf/;
         print STDERR "Running snpEff on VCF, and writing output to: $snpeff_anno\n";
+
+        # Make sure we can find the snpEff jar file and config
+        unless( -e "$snpeff_path/snpEff.jar" and -e "$snpeff_path/snpEff.config" ) {
+            die "Cannot find snpEff jar or config in path: $snpeff_path";
+        }
 
         # Contruct snpEff command using our chosen defaults and run it
         my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntolgy -hgvs GRCh37.75 $input_vcf > $snpeff_anno";
@@ -116,7 +121,7 @@ my $vcf_fh = IO::File->new( $vcf_file ) or die "Couldn't open annotated VCF: $vc
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "Couldn't open output file: $output_maf! $!" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
-my ( $var_sample_idx, $nrm_sample_idx );
+my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
     # Skip all VCF header descriptions cuz we're l33t!
@@ -129,10 +134,10 @@ while( my $line = $vcf_fh->getline ) {
     if( $line =~ m/^#CHROM/ ) {
         if( $format_line and scalar( @rest ) > 0 ) {
             for( my $i = 0; $i <= $#rest; ++$i ) {
-                $var_sample_idx = $i if( $rest[$i] eq $var_sample_id );
-                $nrm_sample_idx = $i if( $rest[$i] eq $nrm_sample_id );
+                $vcf_tumor_idx = $i if( $rest[$i] eq $vcf_tumor_id );
+                $vcf_normal_idx = $i if( $rest[$i] eq $vcf_normal_id );
             }
-            ( defined $var_sample_idx ) or die "No genotypes for $var_sample_id in VCF!\n";
+            ( defined $vcf_tumor_idx ) or die "No genotypes for $vcf_tumor_id in VCF!\n";
         }
         next;
     }
@@ -150,8 +155,8 @@ while( my $line = $vcf_fh->getline ) {
         # Load into a hash, the FORMATted genotype info for the sample containing the variant
         my @format_keys = split( /\:/, $format_line );
         my ( $t_idx, $n_idx ) = ( 0, 0 );
-        %var_sample_info = map {( $format_keys[$t_idx++], $_ )} split( /\:/, $rest[$var_sample_idx] );
-        %nrm_sample_info = map {( $format_keys[$n_idx++], $_ )} split( /\:/, $rest[$nrm_sample_idx] ) if( defined $nrm_sample_idx );
+        %var_sample_info = map {( $format_keys[$t_idx++], $_ )} split( /\:/, $rest[$vcf_tumor_idx] );
+        %nrm_sample_info = map {( $format_keys[$n_idx++], $_ )} split( /\:/, $rest[$vcf_normal_idx] ) if( defined $vcf_normal_idx );
         if( defined $var_sample_info{AD} ) {
             my @allelic_depth = split( /,/, $var_sample_info{AD} );
             # The first depth listed belongs to the reference allele. Of the rest, find the largest
@@ -501,82 +506,46 @@ __DATA__
 
 =head1 NAME
 
- vcf2maf.pl - Map effects of VCF variants on all possible transcripts, and choose one to report in MAF
+ vcf2maf.pl - Map effects of variants in a given VCF, and report them in a MAF
 
 =head1 SYNOPSIS
 
- perl vcf2maf.pl \
-   --input-vcf WD1309_vs_NB1308.vcf --output-maf WD1309_vs_NB1308.maf \
-   --tumor-id WD1309 --normal-id NB1308 \
-   --vep-path /opt/vep --vep-data /srv/vep
+ perl vcf2maf.pl --help
+ perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --tumor-id WD4086 --normal-id NB4086
 
 =head1 OPTIONS
 
-=over 8
-
-=item B<--input-vcf>
-
- Path to input file in VCF format (http://samtools.github.io/hts-specs/)
-
-=item B<--input-vep>
-
- Path to VEP-annotated VCF file (http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout)
-
-=item B<--input-snpeff>
-
- Path to snpEff-annotated VCF file (http://snpeff.sourceforge.net/SnpEff_manual.html#output)
-
-=item B<--output-maf>
-
- Path to output MAF file [Default: STDOUT]
-
-=item B<--tumor-id>
-
- The tumor sample ID to report in the 16th column of the MAF [TUMOR]
-
-=item B<--normal-id>
-
- The normal sample ID to report in the 17th column of the MAF [NORMAL]
-
-=item B<--var-sample-id>
-
- The ID of the sample containing the variant, as used in the VCF header [--tumor-id]
-
-=item B<--nrm-sample-id>
-
- The ID of the matched normal sample as used in the VCF header [--normal-id]
-
-=item B<--use-snpeff>
-
- Use snpEff to annotate the input VCF, instead of the default VEP annotator
-
-=item B<--vep-path>
-
- Path to directory containing the VEP Perl script (variant_effect_predictor.pl) [~/vep]
-
-=item B<--vep-data>
-
- Path to VEP's base cache/plugin directory [~/.vep]
-
-=item B<--snpeff-path>
-
- Path to directory containing snpEff's java archive (snpEff.jar) and config (snpEff.config) [~/snpEff]
-
-=item B<--snpeff-data>
-
- Path to snpEff's data directory, overriding data_dir parameter in snpEff.config [~/snpEff/data]
-
-=item B<--help> Print a brief help message and quit
-
-=item B<--man> Print the detailed manual
-
-=back
+ --input-vcf      Path to input file in VCF format
+ --input-vep      Path to VEP-annotated VCF file
+ --input-snpeff   Path to snpEff-annotated VCF file
+ --output-maf     Path to output MAF file [Default: STDOUT]
+ --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
+ --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
+ --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
+ --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
+ --use-snpeff     Use snpEff to annotate VCF, instead of the default VEP
+ --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
+ --vep-data       VEP's base cache/plugin directory [~/.vep]
+ --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
+ --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]
+ --help           Print a brief help message and quit
+ --man            Print the detailed manual
 
 =head1 DESCRIPTION
 
- To convert a VCF into a MAF, each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect on a single transcript, per variant, is often subjective. So this script tries to follow best practices, but overall makes the selection criteria smarter, reproducible, and more configurable.
+To convert a VCF into a MAF, each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect on a single transcript, per variant, is often subjective. So this script tries to follow best practices, but makes the selection criteria smarter, reproducible, and more configurable.
 
- This script needs Ensembl's VEP (http://ensembl.org/info/docs/tools/vep/index.html) and/or snpEff (http://snpeff.sourceforge.net), variant annotators that can quickly map the effect of a variant on all possible gene transcripts in a database. Visit homepage for more info (https://github.com/ckandoth/vcf2maf).
+This script needs Ensembl's VEP or snpEff - variant annotators that can map the effect of a variant on all possible gene transcripts in a database. For more info, see the README.
+
+=head2 Relevant links:
+
+ vcf2maf Homepage: https://github.com/ckandoth/vcf2maf
+ VCF format: http://samtools.github.io/hts-specs/
+ MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
+ Ensembl VEP: http://ensembl.org/info/docs/tools/vep/index.html
+ VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
+ snpEff: http://snpeff.sourceforge.net
+ snpEff annotated VCF format: http://snpeff.sourceforge.net/SnpEff_manual.html#output
 
 =head1 AUTHORS
 

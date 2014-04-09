@@ -16,22 +16,30 @@ Download the latest release of vcf2maf, and view the detailed usage manual:
 
 To download properly versioned releases, [click here](https://github.com/ckandoth/vcf2maf/releases) for a list.
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, see the sections below. VEP is preferred for it's CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html), and is used by default. So after installing VEP, you can test the script on the provided `test.vcf`:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, see the sections below. VEP is preferred for it's CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html), and is used by default. So after installing VEP, you can test the script like so:
 
-    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf
 
-If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+If you'd rather use snpEff, which runs much faster than VEP, there's an option for that, but make sure you ran snpEff with the `-sequenceOntolgy` option:
 
-    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --vep-path /opt/vep --vep-data /srv/vep
-
-If you'd rather use snpEff, which runs much faster than VEP, there's an option for that:
-
-    perl vcf2maf.pl --input-vcf test.vcf --output-maf test.snpeff.maf --use-snpeff
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.snpeff.maf --use-snpeff
 
 If you already have a VCF annotated with either VEP or snpEff, you can use those directly:
 
-    perl vcf2maf.pl --input-vep test.vep.vcf --output-maf test.maf
-    perl vcf2maf.pl --input-snpeff test.snpeff.vcf --output-maf test.maf
+    perl vcf2maf.pl --input-vep data/test.vep.vcf --output-maf data/test.maf
+    perl vcf2maf.pl --input-snpeff data/test.snpeff.vcf --output-maf data/test.maf
+
+To fill columns 16 and 17 of the output MAF with tumor/normal sample IDs, and to parse out genotypes and allele counts from the corresponding tumor/normal genotype columns in the VCF:
+
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --tumor-id WD1309 --normal-id NB1308
+
+VCFs from variant callers like [VarScan](http://varscan.sourceforge.net/somatic-calling.html#somatic-output) use hardcoded sample IDs TUMOR/NORMAL in the genotype columns of the VCF. To have this script correctly parse the correct genotype columns, while still printing the proper IDs in the output MAF:
+
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --tumor-id WD1309 --normal-id NB1308 --vcf-tumor-id TUMOR --vcf-normal-id NORMAL
+
+If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --vep-path /opt/vep --vep-data /srv/vep
 
 Install VEP
 -----------
