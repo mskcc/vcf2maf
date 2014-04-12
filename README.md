@@ -2,7 +2,7 @@ vcf2maf
 =======
 
 To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean toward best practices. By the current default criteria, a single affected transcript is selected per variant, as follows:
- 1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L398), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L350), and finally by transcript length
+ 1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/v1.2.1/vcf2maf.pl#L417), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/v1.2.1/vcf2maf.pl#L369), and finally by transcript length
  2. Pick the gene affected on the top of the list, and choose it's [canonical](http://www.ensembl.org/Help/Glossary?id=346) transcript (VEP only)
  3. If the gene has no canonical transcript tagged, choose its longest transcript instead
 
