@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# vcf2maf - Convert a VCF into a MAF by mapping each variant to only one of all possible gene isoforms
+
 use strict;
 use warnings;
 use IO::File;
@@ -156,7 +158,7 @@ while( my $line = $vcf_fh->getline ) {
     my @alleles = ( $ref, split( /,/, $alt ));
     my $var_allele_idx = 1;
     my ( %tum_sample_info, %nrm_sample_info, @tum_allele_depths, @nrm_allele_depths );
-    if( $vcf_tumor_idx ) {
+    if( defined $vcf_tumor_idx ) {
 
         # Load into a hash, the FORMATted genotype info for the sample containing the variant
         my @format_keys = split( /\:/, $format_line );
@@ -553,7 +555,7 @@ This script needs Ensembl's VEP or snpEff - variant annotators that can map the 
 
 =head2 Relevant links:
 
- vcf2maf Homepage: https://github.com/ckandoth/vcf2maf
+ Homepage: https://github.com/ckandoth/vcf2maf
  VCF format: http://samtools.github.io/hts-specs/
  MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
  Ensembl VEP: http://ensembl.org/info/docs/tools/vep/index.html
@@ -568,6 +570,6 @@ This script needs Ensembl's VEP or snpEff - variant annotators that can map the 
 
 =head1 LICENSE
 
- LGPLv3, Memorial Sloan-Kettering Cancer Center, New York, NY 10065, USA
+ LGPLv3, Memorial Sloan Kettering Cancer Center, New York, NY 10065, USA
 
 =cut
