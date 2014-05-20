@@ -372,6 +372,7 @@ sub GetEffectPriority {
     my ( $effect ) = @_;
     my %effectPriority = (
         'transcript_ablation' => 1, # A feature ablation whereby the deleted region includes a transcript feature
+        'exon_loss_variant' => 1, # A sequence variant whereby an exon is lost from the transcript
         'splice_donor_variant' => 2, # A splice variant that changes the 2 base region at the 5' end of an intron
         'splice_acceptor_variant' => 2, # A splice variant that changes the 2 base region at the 3' end of an intron
         'stop_gained' => 3, # A sequence variant whereby at least one base of a codon is changed, resulting in a premature stop codon, leading to a shortened transcript
