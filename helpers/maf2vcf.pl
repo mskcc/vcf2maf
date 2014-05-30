@@ -120,7 +120,7 @@ __DATA__
 
 =head1 NAME
 
- maf2vcf.pl - Map effects of variants in a given VCF, and report them in a MAF
+ maf2vcf.pl - Reformat variants in a given MAF, into a generic VCF format with GT:AD:DP if available
 
 =head1 SYNOPSIS
 

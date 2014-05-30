@@ -38,7 +38,9 @@ GetOptions(
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'snpeff-path=s' => \$snpeff_path,
-    'snpeff-data=s' => \$snpeff_data
+    'snpeff-data=s' => \$snpeff_data,
+    'ncbi-build=s' => \$ncbi_build,
+    'maf-center=s' => \$maf_center
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -534,7 +536,7 @@ __DATA__
 
  --input-vcf      Path to input file in VCF format
  --input-vep      Path to VEP-annotated VCF file
- --input-snpeff   Path to snpEff-annotated VCF file
+ --input-snpeff   Path to snpEff-annotated VCF file (must use -sequenceOntology)
  --output-maf     Path to output MAF file [Default: STDOUT]
  --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
@@ -545,6 +547,8 @@ __DATA__
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
  --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]
+ --ncbi-build     NCBI Genome Reference Consortium human build ID to report in MAF [37]
+ --maf-center     Variant calling center to report in MAF [.]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
