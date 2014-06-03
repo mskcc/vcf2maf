@@ -179,7 +179,7 @@ while( my $line = $vcf_fh->getline ) {
 
         # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
         if( defined $tum_info{AD} and $tum_info{AD} ne "." ) {
-            @tum_depths = split( /,/, $tum_info{AD} );
+            @tum_depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AD} );
         }
 
         # Handle VCF lines by VarScan where REF allele depth is stored separately in an RD tag
@@ -248,7 +248,7 @@ while( my $line = $vcf_fh->getline ) {
 
         # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
         if( defined $nrm_info{AD} and $nrm_info{AD} ne "." ) {
-            @nrm_depths = split( /,/, $nrm_info{AD} );
+            @nrm_depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $nrm_info{AD} );
         }
 
         # Handle VCF lines by VarScan where REF allele depth is stored separately in an RD tag
