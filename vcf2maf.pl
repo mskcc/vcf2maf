@@ -75,32 +75,44 @@ elsif( $input_vcf ) {
     if( $use_snpeff ) {
         $snpeff_anno = $input_vcf;
         $snpeff_anno =~ s/(\.vcf)*$/.snpeff.vcf/;
-        print STDERR "Running snpEff on VCF, and writing output to: $snpeff_anno\n";
 
-        # Make sure we can find the snpEff jar file and config
-        unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
-            die "Cannot find snpEff jar or config in path: $snpeff_path";
+        # Skip running snpEff if a snpEff-annotated VCF already exists
+        if( -s $snpeff_anno ) {
+            warn "Annotated VCF already exists ($snpeff_anno). Skipping re-annotation.\n";
         }
+        else {
+            warn "Running snpEff on VCF, and writing output to: $snpeff_anno\n";
+            # Make sure we can find the snpEff jar file and config
+            unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
+                die "Cannot find snpEff jar or config in path: $snpeff_path";
+            }
 
-        # Contruct snpEff command using our chosen defaults and run it
-        my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs GRCh37.75 $input_vcf > $snpeff_anno";
-        print STDERR `$snpeff_cmd`;
-        ( -s $snpeff_anno ) or die "snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
+            # Contruct snpEff command using our chosen defaults and run it
+            my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs GRCh37.75 $input_vcf > $snpeff_anno";
+            print STDERR `$snpeff_cmd`;
+            ( -s $snpeff_anno ) or die "snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
+        }
     }
     else {
         $vep_anno = $input_vcf;
         $vep_anno =~ s/(\.vcf)*$/.vep.vcf/;
-        print STDERR "Running VEP on VCF, and writing output to: $vep_anno\n";
 
-        # Make sure we can find the VEP script
-        unless( glob "$vep_path/variant_effect_predictor.pl" ) {
-            die "Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
+        # Skip running VEP if a VEP-annotated VCF already exists
+        if( -s $vep_anno ) {
+            warn "Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
         }
+        else {
+            warn "Running VEP on VCF, and writing output to: $vep_anno\n";
+            # Make sure we can find the VEP script
+            unless( glob "$vep_path/variant_effect_predictor.pl" ) {
+                die "Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
+            }
 
-        # Contruct VEP command using our chosen defaults and run it
-        my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
-        print STDERR `$vep_cmd`;
-        ( -s $vep_anno ) or die "VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+            # Contruct VEP command using our chosen defaults and run it
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
+            print STDERR `$vep_cmd`;
+            ( -s $vep_anno ) or die "VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+        }
     }
 }
 else {
@@ -483,7 +495,9 @@ sub GetEffectPriority {
         'frameshift_variant' => 3, # A sequence variant which causes a disruption of the translational reading frame, because the number of nucleotides inserted or deleted is not a multiple of three
         'stop_lost' => 3, # A sequence variant where at least one base of the terminator codon (stop) is changed, resulting in an elongated transcript
         'initiator_codon_variant' => 4, # A codon variant that changes at least one base of the first codon of a transcript
-        'inframe_insertion' => 5, # An inframe non synonymous variant that inserts bases into in the coding sequence
+        'disruptive_inframe_insertion' => 5, # An inframe increase in cds length that inserts one or more codons into the coding sequence within an existing codon
+        'disruptive_inframe_deletion' => 5, # An inframe decrease in cds length that deletes bases from the coding sequence starting within an existing codon
+        'inframe_insertion' => 5, # An inframe non synonymous variant that inserts bases into the coding sequence
         'inframe_deletion' => 5, # An inframe non synonymous variant that deletes bases from the coding sequence
         'missense_variant' => 6, # A sequence variant, that changes one or more bases, resulting in a different amino acid sequence but where the length is preserved
         'transcript_amplification' => 7, # A feature amplification of a region containing a transcript
@@ -493,6 +507,7 @@ sub GetEffectPriority {
         'stop_retained_variant' => 10, # A sequence variant where at least one base in the terminator codon is changed, but the terminator remains
         'coding_sequence_variant' => 11, # A sequence variant that changes the coding sequence
         'mature_miRNA_variant' => 11, # A transcript variant located with the sequence of the mature miRNA
+        'exon_variant' => 11, # A sequence variant that changes exon sequence
         '5_prime_UTR_variant' => 12, # A UTR variant of the 5' UTR
         '5_prime_UTR_premature_start_codon_gain_variant' => 12, # snpEff-specific effect, creating a start codon in 5' UTR
         '3_prime_UTR_variant' => 12, # A UTR variant of the 3' UTR
