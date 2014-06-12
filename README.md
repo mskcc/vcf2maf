@@ -55,7 +55,7 @@ Download the v75 release of VEP into your home directory:
 
 Import the Ensembl v75 (Gencode v19) database for humans (writes to `~/.vep` by default):
 
-    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens_vep --VERSION 75
+    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens_vep --VERSION 75 --CONVERT
 
 Test running VEP in offline mode with 4 parallel threads, on the provided example VCF:
 
