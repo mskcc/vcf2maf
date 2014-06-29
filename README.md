@@ -79,7 +79,7 @@ Import the Ensembl v75 (Gencode v19) database for humans (writes to `snpEff/data
 
 Test running snpEff on a sample VCF:
 
-    java -Xmx4g -jar snpEff.jar eff -noStats -sequenceOntolgy -hgvs GRCh37.75 example.vcf > example.snpeff.vcf
+    java -Xmx4g -jar snpEff.jar eff -noStats -sequenceOntology -hgvs GRCh37.75 example.vcf > example.snpeff.vcf
 
 Authors
 -------
