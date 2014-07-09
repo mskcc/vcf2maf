@@ -48,10 +48,10 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Check for valid input combinations
 if(( $input_vcf and $vep_anno ) or ( $input_vcf and $snpeff_anno ) or ( $vep_anno and $snpeff_anno )) {
-    die "Please specify only one input file: input-vcf, input-vep, or input-snpeff\n";
+    die "ERROR: Please specify only one input file: input-vcf, input-vep, or input-snpeff\n";
 }
 elsif( $use_snpeff and ( $vep_anno or $snpeff_anno )) {
-    die "The use-snpeff option can only be used with input-vcf\n";
+    die "ERROR: The use-snpeff option can only be used with input-vcf\n";
 }
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
@@ -60,16 +60,16 @@ $vcf_normal_id = $normal_id unless( $vcf_normal_id );
 
 # Annotate variants in given VCF to all possible transcripts, unless an annotated VCF was provided
 if( $vep_anno ) {
-    ( -s $vep_anno ) or die "Provided VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
-    ( $vep_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
+    ( -s $vep_anno ) or die "ERROR: Provided VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+    ( $vep_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 }
 elsif( $snpeff_anno ) {
-    ( -s $snpeff_anno ) or die "Provided snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
-    ( $snpeff_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
+    ( -s $snpeff_anno ) or die "ERROR: Provided snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
+    ( $snpeff_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 }
 elsif( $input_vcf ) {
-    ( -s $input_vcf ) or die "Provided VCF file is missing or empty!\nPath: $input_vcf\n";
-    ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "Compressed or binary VCFs are not supported\n";
+    ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
+    ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 
     # Run snpEff if user specifically asks for it. Otherwise, run VEP by default
     if( $use_snpeff ) {
@@ -78,19 +78,19 @@ elsif( $input_vcf ) {
 
         # Skip running snpEff if a snpEff-annotated VCF already exists
         if( -s $snpeff_anno ) {
-            warn "Annotated VCF already exists ($snpeff_anno). Skipping re-annotation.\n";
+            warn "WARNING: Annotated VCF already exists ($snpeff_anno). Skipping re-annotation.\n";
         }
         else {
-            warn "Running snpEff on VCF, and writing output to: $snpeff_anno\n";
+            warn "STATUS: Running snpEff on VCF, and writing output to: $snpeff_anno\n";
             # Make sure we can find the snpEff jar file and config
             unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
-                die "Cannot find snpEff jar or config in path: $snpeff_path";
+                die "ERROR: Cannot find snpEff jar or config in path: $snpeff_path";
             }
 
             # Contruct snpEff command using our chosen defaults and run it
             my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs GRCh37.75 $input_vcf > $snpeff_anno";
-            print STDERR `$snpeff_cmd`;
-            ( -s $snpeff_anno ) or die "snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
+            system( $snpeff_cmd ) == 0 or die "ERROR: Failed to run the snpEff annotator!\nCommand: $snpeff_cmd\n";
+            ( -s $snpeff_anno ) or warn "WARNING: snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
         }
     }
     else {
@@ -99,24 +99,24 @@ elsif( $input_vcf ) {
 
         # Skip running VEP if a VEP-annotated VCF already exists
         if( -s $vep_anno ) {
-            warn "Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
+            warn "WARNING: Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
         }
         else {
-            warn "Running VEP on VCF, and writing output to: $vep_anno\n";
+            warn "STATUS: Running VEP on VCF, and writing output to: $vep_anno\n";
             # Make sure we can find the VEP script
             unless( glob "$vep_path/variant_effect_predictor.pl" ) {
-                die "Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
+                die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
             }
 
             # Contruct VEP command using our chosen defaults and run it
             my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
-            print STDERR `$vep_cmd`;
-            ( -s $vep_anno ) or die "VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+            system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
+            ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
         }
     }
 }
 else {
-    die "Please specify an input file: input-vcf, input-vep, or input-snpeff. STDIN is not supported.\n";
+    die "ERROR: Please specify an input file: input-vcf, input-vep, or input-snpeff. STDIN is not supported.\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -138,11 +138,12 @@ push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
 
 # Parse through each variant in the annotated VCF, pull out CSQ/EFF from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
-my $vcf_file = ( $vep_anno ? $vep_anno : $snpeff_anno );
-my $vcf_fh = IO::File->new( $vcf_file ) or die "Couldn't open annotated VCF: $vcf_file! $!";
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
-$maf_fh = IO::File->new( $output_maf, ">" ) or die "Couldn't open output file: $output_maf! $!" if( $output_maf );
+$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf! $!" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
+my $vcf_file = ( $vep_anno ? $vep_anno : $snpeff_anno );
+( -s $vcf_file ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
+my $vcf_fh = IO::File->new( $vcf_file ) or die "ERROR: Couldn't open annotated VCF: $vcf_file! $!";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
@@ -194,13 +195,13 @@ while( my $line = $vcf_fh->getline ) {
             @tum_depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AD} );
         }
 
-        # Handle VCF lines by VarScan where REF allele depth is stored separately in an RD tag
+        # Handle VarScan VCF lines where AD contains only 1 depth, and REF allele depth is in RD
         if( scalar( @tum_depths ) == 1 and defined $tum_info{RD} ) {
             @tum_depths = map{""} @alleles;
             $tum_depths[0] = $tum_info{RD};
             $tum_depths[$var_allele_idx] = $tum_info{AD};
         }
-        # Handle VCF lines by SomaticSniper, where allele depths must be extracted from BCOUNT
+        # Handle SomaticSniper VCF lines, where allele depths must be extracted from BCOUNT
         elsif( defined $tum_info{BCOUNT} ) {
             my %b_idx = ( A=>0, C=>1, G=>2, T=>3 );
             my @bcount = split( /,/, $tum_info{BCOUNT} );
@@ -213,8 +214,12 @@ while( my $line = $vcf_fh->getline ) {
         }
         # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
         elsif( $tum_info{TIR} ) {
-            # Reference depth is not explicitly defined by Strelka for indels, so we have to skip it
+            # Reference allele depth is not provided by Strelka for indels, so we have to skip it
             @tum_depths = ( "", ( split /,/, $tum_info{TIR} )[0] );
+        }
+        # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
+        elsif( defined $tum_info{AO} and defined $tum_info{RO} ) {
+            @tum_depths = ( $tum_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AO} ));
         }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @tum_depths and $#tum_depths != $#alleles ) {
@@ -284,6 +289,10 @@ while( my $line = $vcf_fh->getline ) {
         elsif( $nrm_info{TIR} ) {
             # Reference depth is not explicitly defined by Strelka for indels, so we have to skip it
             @nrm_depths = ( "", ( split /,/, $nrm_info{TIR} )[0] );
+        }
+        # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
+        elsif( defined $nrm_info{AO} and defined $nrm_info{RO} ) {
+            @nrm_depths = ( $nrm_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $nrm_info{AO} ));
         }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @nrm_depths and $#nrm_depths != $#alleles ) {
