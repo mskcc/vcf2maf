@@ -537,6 +537,7 @@ sub GetEffectPriority {
         'feature_elongation' => 18, # A sequence variant that causes the extension of a genomic feature, with regard to the reference sequence
         'feature_truncation' => 18, # A sequence variant that causes the reduction of a genomic feature, with regard to the reference sequence
         'intergenic_variant' => 19, # A sequence variant located in the intergenic region, between genes
+        'intergenic_region' => 19, # snpEff-specific effect that actually means intergenic_variant, but was named incorrectly
         '' => 20
     );
     $effectPriority{$effect} or die "ERROR: Unrecognized effect \"$effect\". Please update your hashes!";
@@ -625,7 +626,7 @@ sub GetVariantClassification {
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
     return "3'UTR" if( $effect eq '3_prime_UTR_variant' );
-    return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|intergenic_variant)$/ );
+    return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|intergenic_variant|intergenic_region)$/ );
     return "5'Flank" if( $effect eq 'upstream_gene_variant' );
     return "3'Flank" if ( $effect eq 'downstream_gene_variant' );
 
