@@ -1,10 +1,10 @@
 vcf2maf
 =======
 
-To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean toward best practices. By the current default criteria, a single affected transcript is selected per variant, as follows:
- 1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/v1.2.1/vcf2maf.pl#L417), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/v1.2.1/vcf2maf.pl#L369), and finally by transcript length
- 2. Pick the gene affected on the top of the list, and choose it's [canonical](http://www.ensembl.org/Help/Glossary?id=346) transcript (VEP only)
- 3. If the gene has no canonical transcript tagged, choose its longest transcript instead
+To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean toward best practices. Per the current default criteria, a single affected transcript is selected per variant, as follows:
+ 1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/v1.2.2/vcf2maf.pl#L549), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/v1.2.2/vcf2maf.pl#L496), and finally by transcript length
+ 2. Pick the gene on the top of the list (worst-affected), and choose it's [canonical](http://www.ensembl.org/Help/Glossary?id=346) transcript (VEP-only feature, that relies on [CCDS](http://www.ncbi.nlm.nih.gov/CCDS/))
+ 3. If the gene has no canonical transcript tagged (if you used snpEff), choose its longest transcript instead
 
 Quick start
 -----------
@@ -20,7 +20,7 @@ If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf
 
-If you'd rather use snpEff, which runs much faster than VEP, there's an option for that, but make sure you ran snpEff with the `-sequenceOntolgy` option:
+If you'd rather use snpEff, there's an option for that, but make sure you ran snpEff with the `-sequenceOntology` option. In older versions of snpEff, this option was incorrectly spelled as `-sequenceOntolgy`:
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.snpeff.maf --use-snpeff
 
@@ -37,9 +37,10 @@ VCFs from variant callers like [VarScan](http://varscan.sourceforge.net/somatic-
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --tumor-id WD1309 --normal-id NB1308 --vcf-tumor-id TUMOR --vcf-normal-id NORMAL
 
-If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, then point the script there:
+If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, there are options available to point the script there. Similar options available for snpEff too:
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --vep-path /opt/vep --vep-data /srv/vep
+    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --snpeff-path /opt/snpEff --snpeff-data /srv/snpEff/data --use-snpeff
 
 Install VEP
 -----------
