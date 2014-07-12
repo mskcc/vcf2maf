@@ -78,38 +78,66 @@ while( my $line = $maf_fh->getline ) {
         next;
     }
 
-    # Parse out the bare minimum data needed for a VCF
-    my ( $chr, $pos, $type, $ref, $alt1, $alt2, $t_id, $n_id ) = @cols[4,5,9..12,15,16];
+    # From the MAF, parse out the bare minimum data needed by a VCF
+    my ( $chr, $pos, $type, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = @cols[4,5,9..12,15..18];
 
     # Parse out read counts for ref/var alleles, if available
     my ( $t_dp, $t_rad, $t_vad ) = map{( $col_idx{$_} ? $cols[$col_idx{$_}] : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col );
     my ( $n_dp, $n_rad, $n_vad ) = map{( $col_idx{$_} ? $cols[$col_idx{$_}] : '.' )} ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
-    # Figure out genotypes and construct FORMATted genotype fields
-    my $t_gt = ( $alt1 eq $alt2 ? "1/1" : "0/1" );
-    $ref =~ s/^(\?|-|0)$//; $alt1 =~ s/^(\?|-|0)$//; $alt2 =~ s/^(\?|-|0)$//;
-    my $var = ( $alt1 ne $ref ? $alt1 : $alt2 );
-    my $t_fmt = "$t_gt:$t_rad,$t_vad:$t_dp";
-    my $n_fmt = "0/0:$n_rad,$n_vad:$n_dp"; # We'll assume homozygous reference in normal tissue
+    # If normal alleles are unset in the MAF (quite common), assume homozygous reference
+    $n_al1 = $ref unless( $n_al1 );
+    $n_al2 = $ref unless( $n_al2 );
 
-    # To represent indels in VCF format, we'll need to fetch the preceding bp from a reference FASTA
-    my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
+    # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     if( $type eq "DEL" or $type eq "INS" ) {
         --$pos if( $type eq "DEL" );
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
         $prefix_bp or die "Couldn't get samtools to run!\n";
-        $ref =~ s/^/$prefix_bp/;
-        $var =~ s/^/$prefix_bp/;
+        # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
+        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)$//; s/^/$prefix_bp/} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
     # SNPs, MNPs, and other complex substitutions don't need any conversion for the VCF
     elsif( $type !~ m/^(SNP|DNP|TNP|ONP)$/ ) {
-        die "Cannot handle this variant type: $type\n";
+        die "Invalid variant type: $type\n";
     }
+
+    # To simplify setting tumor genotype later, ensure that $al2 is always non-REF
+    ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq $ref );
+    # Do the same for the normal alleles, though it makes no difference if both are REF
+    ( $n_al1, $n_al2 ) = ( $n_al2, $n_al1 ) if( $n_al2 eq $ref );
+
+    # Fill an array with all unique REF/ALT alleles, and set their 0-based indexes like in a VCF
+    # Notice how we ensure that $alleles[0] is REF and #alleles[1] is the major ALT allele in tumor
+    my ( @alleles, %al_idx, $idx ) = ((), (), 0 );
+    foreach my $al ( $ref, $al2, $al1, $n_al2, $n_al1 ) {
+        unless( defined $al_idx{$al} ) {
+            push( @alleles, $al );
+            $al_idx{$al} = $idx++;
+        }
+    }
+
+    # Set tumor and normal genotypes (FORMAT tag GT in VCF)
+    my $t_gt = join( "/", $al_idx{$al1}, $al_idx{$al2} );
+    my $n_gt = join( "/", $al_idx{$n_al1}, $al_idx{$n_al2} );
+
+    # Set the comma-delimited ALT field for the VCF that lists all non-REF alleles
+    my $alt = join( ",", @alleles[1..$#alleles] );
+
+    # If there are >1 variant alleles, assume that depths in $t_vad and $n_vad are for $al2
+    if( scalar( @alleles ) > 2 ) {
+        $t_vad = join( ",", $t_vad, map{"."}@alleles[2..$#alleles] );
+        $n_vad = join( ",", $n_vad, map{"."}@alleles[2..$#alleles] );
+    }
+
+    # Construct genotype fields for FORMAT tags GT:AD:DP
+    my $t_fmt = "$t_gt:$t_rad,$t_vad:$t_dp";
+    my $n_fmt = "$n_gt:$n_rad,$n_vad:$n_dp";
 
     # Contruct a VCF formatted line and append it to the respective VCF
     my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-    my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $var, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
+    my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
     my $vcf_fh = IO::File->new( $vcf_file, ">>" );
     $vcf_fh->print( "$vcf_line\n" );
     $vcf_fh->close;
