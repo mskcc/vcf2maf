@@ -43,10 +43,10 @@ GetOptions(
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
-# Fetch all tumor-normal paired IDs from the MAF
-my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; $_}`egrep -v "^#|^Hugo_Symbol" $input_maf | cut -f 16,17 | sort -u`;
+# Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step 
+my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol" $input_maf | cut -f 16,17 | sort -u`;
 
-# For each TN-pair, initialize blank VCFs with proper VCF headers in user-specified output directory
+# For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
 unless( -e $output_dir ) { mkdir $output_dir or die "Couldn't create directory $output_dir! $!"; }
 foreach my $pair ( @tn_pair ) {
     my ( $t_id, $n_id ) = split( /\t/, $pair );
@@ -78,7 +78,7 @@ while( my $line = $maf_fh->getline ) {
         next;
     }
 
-    # From the MAF, parse out the bare minimum data needed by a VCF
+    # For a variant in the MAF, parse out the bare minimum data needed by a VCF
     my ( $chr, $pos, $type, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = @cols[4,5,9..12,15..18];
 
     # Parse out read counts for ref/var alleles, if available
@@ -122,7 +122,7 @@ while( my $line = $maf_fh->getline ) {
     my $t_gt = join( "/", $al_idx{$al1}, $al_idx{$al2} );
     my $n_gt = join( "/", $al_idx{$n_al1}, $al_idx{$n_al2} );
 
-    # Set the comma-delimited ALT field for the VCF that lists all non-REF alleles
+    # Create the VCF's comma-delimited ALT field that must list all non-REF (variant) alleles
     my $alt = join( ",", @alleles[1..$#alleles] );
 
     # If there are >1 variant alleles, assume that depths in $t_vad and $n_vad are for $al2
@@ -148,7 +148,7 @@ __DATA__
 
 =head1 NAME
 
- maf2vcf.pl - Reformat variants in a given MAF, into a generic VCF format with GT:AD:DP if available
+ maf2vcf.pl - Reformat variants in a given MAF, into generic VCFs with GT:AD:DP data if available
 
 =head1 SYNOPSIS
 
@@ -171,7 +171,7 @@ __DATA__
 
 =head1 DESCRIPTION
 
-This script breaks down variants in a MAF into VCFs for each tumor-normal pair, ready for annotation with Ensembl's VEP or snpEff.
+This script breaks down variants in a MAF into VCFs for each tumor-normal pair, im preparation for annotation with vcf2maf.
 
 =head2 Relevant links:
 
