@@ -15,7 +15,7 @@ my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( 37, ".", 0.7 );
 
 # Check for missing or crappy arguments
-unless( @ARGV and $ARGV[0]=~m/^-/ ) {
+unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
     pod2usage( -verbose => 0, -message => "$0: Missing or invalid arguments!\n", -exitval => 2 );
 }
 
@@ -125,15 +125,22 @@ my @maf_header = qw(
     Variant_Classification Variant_Type Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2
     dbSNP_RS dbSNP_Val_Status Tumor_Sample_Barcode Matched_Norm_Sample_Barcode
     Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 Tumor_Validation_Allele1 Tumor_Validation_Allele2
-    Match_Norm_Validation_Allele1 Match_Norm_Validation_Allele2 Verification_Status Validation_Status
-    Mutation_Status Sequencing_Phase Sequence_Source Validation_Method Score BAM_File Sequencer
-    Tumor_Sample_UUID Matched_Norm_Sample_UUID HGVSc HGVSp Transcript_ID Exon_Number
-    t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count
+    Match_Norm_Validation_Allele1 Match_Norm_Validation_Allele2 Verification_Status
+    Validation_Status Mutation_Status Sequencing_Phase Sequence_Source Validation_Method Score
+    BAM_File Sequencer Tumor_Sample_UUID Matched_Norm_Sample_UUID HGVSc HGVSp Transcript_ID
+    Exon_Number t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count all_effects
 );
 
 # Add extra columns to the MAF depending on whether we used VEP or snpEff
-my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position Protein_position Amino_acids Codons Existing_variation AA_MAF EA_MAF ALLELE_NUM RefSeq EXON INTRON MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE DISTANCE STRAND CLIN_SIG CANONICAL SYMBOL SYMBOL_SOURCE SIFT PolyPhen GMAF BIOTYPE ENSP DOMAINS CCDS HGVSc HGVSp AFR_MAF AMR_MAF ASN_MAF EUR_MAF PUBMED );
-my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank Genotype_Number ERRORS WARNINGS );
+my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position
+    Protein_position Amino_acids Codons Existing_variation AA_MAF EA_MAF ALLELE_NUM RefSeq EXON
+    INTRON MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE DISTANCE STRAND CLIN_SIG CANONICAL
+    SYMBOL SYMBOL_SOURCE SIFT PolyPhen GMAF BIOTYPE ENSP DOMAINS CCDS HGVSc HGVSp AFR_MAF AMR_MAF
+    ASN_MAF EUR_MAF PUBMED );
+my @vepcsq_cols_format = (); # To store the actual order of VEP data, that may differ between runs
+my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
+    Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
+    Genotype_Number ERRORS WARNINGS );
 push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
 
 # Parse through each variant in the annotated VCF, pull out CSQ/EFF from the INFO column, and choose
@@ -147,7 +154,11 @@ my $vcf_fh = IO::File->new( $vcf_file ) or die "ERROR: Couldn't open annotated V
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
-    # Skip all VCF header descriptions cuz we're l33t!
+    # Parse out the VEP CSQ format, which seems to differ between runs
+    if( $line =~ m/^##INFO=<ID=CSQ.*Format: (\S+)">$/ ) {
+        @vepcsq_cols_format = split( /\|/, $1 );
+    }
+    # Skip all other header lines
     next if( $line =~ m/^##/ );
 
     chomp( $line );
@@ -187,7 +198,7 @@ while( my $line = $vcf_fh->getline ) {
             my @genotype = split( /[\/|]/, $tum_info{GT} );
             # In case of polyploid calls, choose the first non-REF allele, if any
             ( $var_allele_idx ) = grep {$_ ne "0"} @genotype;
-            $var_allele_idx = 1 unless( defined $var_allele_idx );
+            $var_allele_idx = 1 unless( defined $var_allele_idx and $var_allele_idx =~ m/^\d+$/ );
         }
 
         # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
@@ -333,38 +344,36 @@ while( my $line = $vcf_fh->getline ) {
         }
     }
 
-    my @all_effects = (); # A list of all effects per variant that can be reported in extra MAF columns
+    my @all_effects = (); # A list of effects of this variant on all possible transcripts
     my $maf_effect = {}; # A single effect per variant to report in the standard MAF columns
 
     ### Parsing VEP consequences
-    # INFO:CSQ is a comma-delimited list of VEP consequences, with pipe-delim details per consequence
-    # VEP replaces commas in details with '&'. We'll assume that all '&'s we see, were formerly commas
-    # Consequence often reports multiple effects on the same transcript e.g. missense, splice_region
-    # CSQ = Allele | Gene | Feature | Feature_type | Consequence | cDNA_position | CDS_position | Protein_position | Amino_acids | Codons | Existing_variation | AA_MAF | EA_MAF | ALLELE_NUM | RefSeq | EXON | INTRON | MOTIF_NAME | MOTIF_POS | HIGH_INF_POS | MOTIF_SCORE_CHANGE | DISTANCE | STRAND | CLIN_SIG | CANONICAL | SYMBOL | SYMBOL_SOURCE | SIFT | PolyPhen | GMAF | BIOTYPE | ENSP | DOMAINS | CCDS | HGVSc | HGVSp | AFR_MAF | AMR_MAF | ASN_MAF | EUR_MAF | PUBMED , ...
+    # INFO:CSQ is a comma-delim list of VEP consequences, with pipe-delim details per consequence
+    # VEP replaces ',' in details with '&'. We'll assume that all '&'s we see, were formerly commas
+    # Consequence might report multiple effects on the same transcript e.g. missense,splice_region
     if( $info{CSQ} ) {
 
         foreach my $csq_line ( split( /,/, $info{CSQ} )) {
             my $idx = 0;
-            my %effect = map{s/\&/,/g; ( $vepcsq_cols[$idx++], $_ )} split( /\|/, $csq_line );
+            my %effect = map{s/\&/,/g; ( $vepcsq_cols_format[$idx++], ( defined $_ ? $_ : '' ))} split( /\|/, $csq_line );
 
             # Skip effects on other ALT alleles
             if( $effect{ALLELE_NUM} == $var_allele_idx ) {
 
-                # Fix potential warnings about undefined variables
-                $effect{BIOTYPE} = '' unless( $effect{BIOTYPE} );
-                $effect{Consequence} = '' unless( $effect{Consequence} );
-                $effect{CANONICAL} = '' unless( $effect{CANONICAL} );
-                $effect{SYMBOL} = '' unless( $effect{SYMBOL} );
-
                 # Remove transcript ID from HGVS codon/protein changes, to make it easier on the eye
-                $effect{HGVSc} =~ s/^.*:// if( $effect{HGVSc} );
-                $effect{HGVSp} =~ s/^.*:// if( $effect{HGVSp} );
+                $effect{HGVSc} =~ s/^.*://;
+                $effect{HGVSp} =~ s/^.*://;
+
+                # Copy VEP CSQ data into MAF fields that don't share the same identifier
+                $effect{Transcript_ID} = $effect{Feature};
+                $effect{Exon_Number} = $effect{EXON};
+                $effect{Hugo_Symbol} = ( $effect{SYMBOL} ? $effect{SYMBOL} : 'Unknown' );
 
                 # Transcript length isn't directly reported, but can be parsed out from another field
                 ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/;
-                $effect{Transcript_Length} = 0 unless( $effect{Transcript_Length} );
+                $effect{Transcript_Length} = 0 unless( defined $effect{Transcript_Length} );
 
-                # If there are many possible consequences on a transcript, choose the most severe one
+                # If there are several consequences listed for a transcript, choose the most severe one
                 ( $effect{Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( /,/, $effect{Consequence} );
 
                 push( @all_effects, \%effect );
@@ -406,18 +415,19 @@ while( my $line = $vcf_fh->getline ) {
         foreach my $eff_line ( split( /,/, $info{EFF} )) {
             if( $eff_line =~ /^(\w+)\((.+)\)$/ ) {
                 my $idx = 0;
-                my %effect = map{( $snpeff_cols[$idx++], $_ )} ( $1, split( /\|/, $2 ));
+                my %effect = map{( $snpeff_cols[$idx++], ( defined $_ ? $_ : '' ))} ( $1, split( /\|/, $2 ));
 
                 # Skip transcripts with errors/warnings, or effects on other ALT alleles
                 unless( $effect{ERRORS} or $effect{WARNINGS} or $effect{Genotype_Number} != $var_allele_idx ) {
 
-                    # Fix potential warnings about undefined variables
-                    $effect{Transcript_BioType} = '' unless( $effect{Transcript_BioType} );
-                    $effect{Effect} = '' unless( $effect{Effect} );
-                    $effect{Gene_Name} = '' unless( $effect{Gene_Name} );
+                    # Copy snpEff EFF data into MAF fields that don't share the same identifier
+                    $effect{Exon_Number} = $effect{Exon_Rank};
+                    $effect{Hugo_Symbol} = ( $effect{Gene_Name} ? $effect{Gene_Name} : 'Unknown' );
 
                     # HGVS formatted codon/protein changes need to be parsed out of Amino_Acid_Change
                     ( $effect{HGVSp}, $effect{HGVSc} ) = $effect{Amino_Acid_Change} =~ m/^(.*)\/(.*)$/;
+                    $effect{HGVSc} = '' unless( $effect{HGVSc} );
+                    $effect{HGVSp} = '' unless( $effect{HGVSp} );
 
                     # Transcript length isn't reported, so we have to use AA length, where available
                     $effect{Amino_Acid_Length} = 0 unless( $effect{Amino_Acid_Length} );
@@ -449,7 +459,6 @@ while( my $line = $vcf_fh->getline ) {
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
     my %maf_line = map{ ( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' )) } @maf_header;
-    $maf_line{Hugo_Symbol} = ( $maf_effect->{SYMBOL} ? $maf_effect->{SYMBOL} : ( $maf_effect->{Gene_Name} ? $maf_effect->{Gene_Name} : 'Unknown' ));
     $maf_line{Entrez_Gene_Id} = '0';
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
@@ -457,30 +466,46 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{Start_Position} = $start;
     $maf_line{End_Position} = $stop;
     $maf_line{Strand} = '+';
-    my $so_effect = ( $maf_effect->{Consequence} ? $maf_effect->{Consequence} : $maf_effect->{Effect} );
+    my $so_effect = ( $maf_effect->{Effect} ? $maf_effect->{Effect} : $maf_effect->{Consequence} );
     $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type);
     $maf_line{Variant_Type} = $var_type;
     $maf_line{Reference_Allele} = $ref;
-    # If the genotypes are unavailable, then we'll assume it's ref/var heterozygous
+    # ::NOTE:: If tumor genotype is unavailable, then we'll assume it's ref/var heterozygous
     $maf_line{Tumor_Seq_Allele1} = $ref;
-    if( defined $tum_info{GT} and $tum_info{GT} ne "." and $tum_info{GT} ne "./." ) {
-        # ::NOTE:: MAF format doesn't support triallelic genotypes. So break it down as necessary
-        my ( $idx1, $idx2 ) = split( /[\/|]/, $tum_info{GT} );
-        $maf_line{Tumor_Seq_Allele1} = ( $alleles[$idx1] eq $var ? $alleles[$idx2] : $alleles[$idx1] );
-    }
     $maf_line{Tumor_Seq_Allele2} = $var;
+    if( defined $tum_info{GT} and $tum_info{GT} ne "." and $tum_info{GT} ne "./." ) {
+        # ::NOTE:: MAF format only supports biallelic sites. Tumor_Seq_Allele2 must always be the
+        # $var selected earlier. For Tumor_Seq_Allele1, choose the first non-var allele listed
+        my ( $idx1, $idx2 ) = split( /[\/|]/, $tum_info{GT} );
+        $maf_line{Tumor_Seq_Allele1} = ( $alleles[$idx1] ne $var ? $alleles[$idx1] : $alleles[$idx2] );
+    }
+    # ::NOTE:: If normal genotype is unavailable, then we'll assume it's ref/ref homozygous
+    $maf_line{Match_Norm_Seq_Allele1} = $ref;
+    $maf_line{Match_Norm_Seq_Allele2} = $ref;
+    if( defined $nrm_info{GT} and $nrm_info{GT} ne "." and $nrm_info{GT} ne "./." ) {
+        # ::NOTE:: MAF format only supports biallelic sites. So choose the first two listed
+        my ( $idx1, $idx2 ) = split( /[\/|]/, $nrm_info{GT} );
+        $maf_line{Match_Norm_Seq_Allele1} = $alleles[$idx1];
+        $maf_line{Match_Norm_Seq_Allele2} = $alleles[$idx2];
+    }
     $maf_line{dbSNP_RS} = GetrsIDs( $ids );
     $maf_line{Tumor_Sample_Barcode} = $tumor_id;
     $maf_line{Matched_Norm_Sample_Barcode} = $normal_id;
-    $maf_line{HGVSc} = ( $maf_effect->{HGVSc} ? $maf_effect->{HGVSc} : '' );
-    $maf_line{HGVSp} = ( $maf_effect->{HGVSp} ? $maf_effect->{HGVSp} : '' );
-    $maf_line{Transcript_ID} = ( $maf_effect->{RefSeq} ? $maf_effect->{RefSeq} : ( $maf_effect->{Transcript_ID} ? $maf_effect->{Transcript_ID} : '' ));
-    $maf_line{Exon_Number} = ( $maf_effect->{EXON} ? $maf_effect->{EXON} : ( $maf_effect->{Exon_Rank} ? $maf_effect->{Exon_Rank} : '' ));
     $maf_line{t_depth} = $tum_info{DP} if( defined $tum_info{DP} and $tum_info{DP} ne "." );
     ( $maf_line{t_ref_count}, $maf_line{t_alt_count} ) = @tum_depths[0,$var_allele_idx] if( @tum_depths );
     $maf_line{n_depth} = $nrm_info{DP} if( defined $nrm_info{DP} and $nrm_info{DP} ne "." );
     ( $maf_line{n_ref_count}, $maf_line{n_alt_count} ) = @nrm_depths[0,$var_allele_idx] if( @nrm_depths );
 
+    # Create a semicolon delimited list summarizing the prioritized effects in @all_effects
+    $maf_line{all_effects} = "";
+    foreach my $effect ( @all_effects ) {
+        my $effect_type = ( $effect->{Effect} ? $effect->{Effect} : $effect->{Consequence} );
+        my $transcript_id = $effect->{Transcript_ID};
+        my $protein_change = $effect->{HGVSp};
+        $maf_line{all_effects} .= "$effect_type,$transcript_id,$protein_change;" if( defined $effect_type and $transcript_id );
+    }
+
+    # At this point, we've generated all we can about this variant, so write it to the MAF
     foreach my $col ( @maf_header ) {
         $maf_fh->print( "\t" ) if ( $col ne $maf_header[0] );
         $maf_fh->print( $maf_line{$col} );
@@ -495,6 +520,7 @@ $vcf_fh->close;
 # ::NOTE:: snpEff conversion to SO terms has caveats, so handle exceptions as necessary
 sub GetEffectPriority {
     my ( $effect ) = @_;
+    $effect = '' unless( defined $effect );
     my %effectPriority = (
         'transcript_ablation' => 1, # A feature ablation whereby the deleted region includes a transcript feature
         'exon_loss_variant' => 1, # A sequence variant whereby an exon is lost from the transcript
@@ -548,6 +574,7 @@ sub GetEffectPriority {
 # All possible biotypes are defined here: http://www.gencodegenes.org/gencode_biotypes.html
 sub GetBiotypePriority {
     my ( $biotype ) = @_;
+    $biotype = '' unless( defined $biotype );
     my %biotype_priority = (
         'protein_coding' => 1, # Contains an open reading frame (ORF)
         'LRG_gene' => 2, # Gene in a "Locus Reference Genomic" region known to have disease-related sequence variations
@@ -640,7 +667,7 @@ sub GetVariantClassification {
 sub GetrsIDs {
 
     my ( $id_line ) = @_;
-    return '' if( not defined $id_line or $id_line eq '.' or $id_line=~m/^\s*$/ ); # Handle null data
+    return '' if( not defined $id_line or $id_line eq '.' or $id_line =~ m/^\s*$/ ); # Handle null data
     my @rs_ids = grep( /^rs\d+$/, split( /;/, $id_line )); # Pull out rsIDs into a list
 
     # If no rsIDs were found, return null. Else return a semicolon delimited list
