@@ -15,9 +15,9 @@ The subsequent 10 columns are relevant to most analyses.
 44. n_alt_count - read depth supporting the variant allele in normal BAM
 
 The next column is relevant to analyses that consider the effect of the variant on all alternate
-isoforms of the gene, or on other downstream/upstream transcripts. The effects are sorted first by
+isoforms of the gene, or on non-coding/regulatory transcripts. The effects are sorted first by
 transcript biotype priority, then by effect severity, and finally by decreasing order of transcript
-length. Each effect in the list is in the format [Effect,Transcript_ID,HGVSp].
+length. Each effect in the list is in the format [SYMBOL,Consequence,HGVSp,Transcript_ID].
 
 45. all_effects - a semicolon delimited list of all possible variant effects, sorted by priority
 

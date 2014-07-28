@@ -361,8 +361,8 @@ while( my $line = $vcf_fh->getline ) {
             if( $effect{ALLELE_NUM} == $var_allele_idx ) {
 
                 # Remove transcript ID from HGVS codon/protein changes, to make it easier on the eye
-                $effect{HGVSc} =~ s/^.*://;
-                $effect{HGVSp} =~ s/^.*://;
+                $effect{HGVSc} =~ s/^.*:// if( $effect{HGVSc} );
+                $effect{HGVSp} =~ s/^.*:// if( $effect{HGVSp} );
 
                 # Copy VEP CSQ data into MAF fields that don't share the same identifier
                 $effect{Transcript_ID} = $effect{Feature};
@@ -390,7 +390,7 @@ while( my $line = $vcf_fh->getline ) {
         # For the MAF, we will report the effect on the canonical transcript of the first priority gene
         my $maf_gene = $all_effects[0]->{SYMBOL};
         if( $maf_gene and $maf_gene ne '' ) {
-            ( $maf_effect ) = grep { $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} eq "YES" } @all_effects;
+            ( $maf_effect ) = grep { defined $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} eq "YES" } @all_effects;
 
             # If that gene had no canonical transcript tagged, choose the longest transcript instead
             unless( $maf_effect ) {
@@ -499,10 +499,11 @@ while( my $line = $vcf_fh->getline ) {
     # Create a semicolon delimited list summarizing the prioritized effects in @all_effects
     $maf_line{all_effects} = "";
     foreach my $effect ( @all_effects ) {
+        my $gene_name = ( $effect->{Hugo_Symbol} ? $effect->{Hugo_Symbol} : '' );
         my $effect_type = ( $effect->{Effect} ? $effect->{Effect} : $effect->{Consequence} );
-        my $transcript_id = $effect->{Transcript_ID};
-        my $protein_change = $effect->{HGVSp};
-        $maf_line{all_effects} .= "$effect_type,$transcript_id,$protein_change;" if( defined $effect_type and $transcript_id );
+        my $transcript_id = ( $effect->{Transcript_ID} ? $effect->{Transcript_ID} : '' );
+        my $protein_change = ( $effect->{HGVSp} ? $effect->{HGVSp} : '' );
+        $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id;" if( defined $effect_type and $transcript_id );
     }
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
