@@ -82,8 +82,8 @@ while( my $line = $maf_fh->getline ) {
     my ( $chr, $pos, $type, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = @cols[4,5,9..12,15..18];
 
     # Parse out read counts for ref/var alleles, if available
-    my ( $t_dp, $t_rad, $t_vad ) = map{( $col_idx{$_} ? $cols[$col_idx{$_}] : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col );
-    my ( $n_dp, $n_rad, $n_vad ) = map{( $col_idx{$_} ? $cols[$col_idx{$_}] : '.' )} ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
+    my ( $t_dp, $t_rad, $t_vad ) = map{( defined $col_idx{$_} ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col );
+    my ( $n_dp, $n_rad, $n_vad ) = map{( defined $col_idx{$_} ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
     # If normal alleles are unset in the MAF (quite common), assume homozygous reference
     $n_al1 = $ref unless( $n_al1 );
@@ -94,9 +94,9 @@ while( my $line = $maf_fh->getline ) {
         --$pos if( $type eq "DEL" );
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
-        $prefix_bp or die "Couldn't get samtools to run!\n";
+        $prefix_bp =~ m/^[ACGTN]$/ or die "Failed to fetch bps from reference FASTA!\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
-        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)$//; s/^/$prefix_bp/} ( $ref, $al1, $al2, $n_al1, $n_al2 );
+        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
     # SNPs, MNPs, and other complex substitutions don't need any conversion for the VCF
     elsif( $type !~ m/^(SNP|DNP|TNP|ONP)$/ ) {
@@ -110,7 +110,8 @@ while( my $line = $maf_fh->getline ) {
 
     # Fill an array with all unique REF/ALT alleles, and set their 0-based indexes like in a VCF
     # Notice how we ensure that $alleles[0] is REF and #alleles[1] is the major ALT allele in tumor
-    my ( @alleles, %al_idx, $idx ) = ((), (), 0 );
+    my ( @alleles, %al_idx );
+    my $idx = 0;
     foreach my $al ( $ref, $al2, $al1, $n_al2, $n_al1 ) {
         unless( defined $al_idx{$al} ) {
             push( @alleles, $al );
