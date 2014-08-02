@@ -491,7 +491,6 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{Start_Position} = $start;
     $maf_line{End_Position} = $stop;
     $maf_line{Strand} = '+'; # Per MAF definition, only the positive strand is an accepted value
-    print STDERR $info{EFF}."\t".$maf_effect->{Hugo_Symbol}."\n" unless( defined $maf_effect->{Effect} );
     my $so_effect = ( $maf_effect->{Effect} ? $maf_effect->{Effect} : $maf_effect->{Consequence} );
     $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type);
     $maf_line{Variant_Type} = $var_type;
