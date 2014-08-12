@@ -554,6 +554,7 @@ sub GetEffectPriority {
         'stop_gained' => 3, # A sequence variant whereby at least one base of a codon is changed, resulting in a premature stop codon, leading to a shortened transcript
         'frameshift_variant' => 3, # A sequence variant which causes a disruption of the translational reading frame, because the number of nucleotides inserted or deleted is not a multiple of three
         'stop_lost' => 3, # A sequence variant where at least one base of the terminator codon (stop) is changed, resulting in an elongated transcript
+        'start_lost' => 4, # A codon variant that changes at least one base of the canonical start codon
         'initiator_codon_variant' => 4, # A codon variant that changes at least one base of the first codon of a transcript
         'disruptive_inframe_insertion' => 5, # An inframe increase in cds length that inserts one or more codons into the coding sequence within an existing codon
         'disruptive_inframe_deletion' => 5, # An inframe decrease in cds length that deletes bases from the coding sequence starting within an existing codon
@@ -669,7 +670,7 @@ sub GetVariantClassification {
     return "Frame_Shift_Del" if ( $effect eq 'frameshift_variant' and $var_type eq 'DEL' );
     return "Frame_Shift_Ins" if( $effect eq 'frameshift_variant' and $var_type eq 'INS' );
     return "Nonstop_Mutation" if( $effect eq 'stop_lost' );
-    return "Translation_Start_Site" if( $effect eq 'initiator_codon_variant' );
+    return "Translation_Start_Site" if( $effect =~ /^(initiator_codon_variant|start_lost)$/ );
     return "In_Frame_Ins" if( $effect eq 'inframe_insertion' );
     return "In_Frame_Del" if( $effect eq 'inframe_deletion' );
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant)$/ );
