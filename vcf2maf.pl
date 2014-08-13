@@ -561,6 +561,8 @@ sub GetEffectPriority {
         'inframe_insertion' => 5, # An inframe non synonymous variant that inserts bases into the coding sequence
         'inframe_deletion' => 5, # An inframe non synonymous variant that deletes bases from the coding sequence
         'missense_variant' => 6, # A sequence variant, that changes one or more bases, resulting in a different amino acid sequence but where the length is preserved
+        'conservative_missense_variant' => 6, # A sequence variant whereby at least one base of a codon is changed resulting in a codon that encodes for a different but similar amino acid. These variants may or may not be deleterious
+        'rare_amino_acid_variant' => 6, # A sequence variant whereby at least one base of a codon encoding a rare amino acid is changed, resulting in a different encoded amino acid
         'transcript_amplification' => 7, # A feature amplification of a region containing a transcript
         'splice_region_variant' => 8, # A sequence variant in which a change has occurred within the region of the splice site, either within 1-3 bases of the exon or 3-8 bases of the intron
         'incomplete_terminal_codon_variant' => 9, # A sequence variant where at least one base of the final codon of an incompletely annotated transcript is changed
@@ -673,7 +675,7 @@ sub GetVariantClassification {
     return "Translation_Start_Site" if( $effect =~ /^(initiator_codon_variant|start_lost)$/ );
     return "In_Frame_Ins" if( $effect eq 'inframe_insertion' );
     return "In_Frame_Del" if( $effect eq 'inframe_deletion' );
-    return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant)$/ );
+    return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
     return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC)$/ );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|nc_transcript_variant)$/ );
