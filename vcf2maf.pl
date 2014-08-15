@@ -109,7 +109,7 @@ elsif( $input_vcf ) {
             }
 
             # Contruct VEP command using our chosen defaults and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 2 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
             system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
         }
