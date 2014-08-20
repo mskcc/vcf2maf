@@ -12,7 +12,7 @@ use Pod::Usage qw( pod2usage );
 my ( $vep_path, $vep_data ) = ( "~/vep", "~/.vep" );
 my ( $snpeff_path, $snpeff_data ) = ( "~/snpEff", "~/snpEff/data" );
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( 37, ".", 0.7 );
+my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
@@ -109,7 +109,8 @@ elsif( $input_vcf ) {
             }
 
             # Contruct VEP command using our chosen defaults and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly GRCh37 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
+
             system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
         }
@@ -136,7 +137,8 @@ my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position
     Protein_position Amino_acids Codons Existing_variation AA_MAF EA_MAF ALLELE_NUM RefSeq EXON
     INTRON MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE DISTANCE STRAND CLIN_SIG CANONICAL
     SYMBOL SYMBOL_SOURCE SIFT PolyPhen GMAF BIOTYPE ENSP DOMAINS CCDS HGVSc HGVSp AFR_MAF AMR_MAF
-    ASN_MAF EUR_MAF PUBMED );
+    ASN_MAF EUR_MAF PUBMED HGNC_ID SWISSPROT TREMBL UNIPARC SOMATIC );
+
 my @vepcsq_cols_format; # To store the actual order of VEP data, that may differ between runs
 my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
     Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank

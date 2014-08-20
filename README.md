@@ -47,20 +47,23 @@ Install VEP
 
 Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/tools/vep/index.html)) is popular for how it selects a single "canonical transcript" per gene as [detailed here](http://useast.ensembl.org/Help/Glossary?id=346), its CLIA-compliant [HGVS variant format](http://www.hgvs.org/mutnomen/recs.html), and [Sequence Ontology nomenclature](http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences) for variant effects. It's download-able as a Perl script, so make sure you have [Perl installed](http://www.perl.org/get.html).
 
-Download the v75 release of VEP into your home directory:
+Download the v76 release of VEP into your home directory:
 
     cd ~/
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/75.tar.gz
-    tar -zxf 75.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|vep/|g'
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/76.tar.gz
+    tar -zxf 76.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|vep/|g'
     cd vep
 
-Import the Ensembl v75 (Gencode v19) database for humans (writes to `~/.vep` by default):
+To significantly speed up the step where VEP looks up known variants in COSMIC/dbSNP/etc., it's strongly recommended to have [tabix](https://github.com/samtools/tabix) installed, or available in your `$PATH`. Install it with `apt-get install tabix` on Ubuntu/Debian or `yum install tabix` on CentOS/Redhat/Fedora.
 
-    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens_vep --VERSION 75 --CONVERT
+Import the Ensembl v76 (Gencode v20) cache for GRCh37 and GRCh38 (writes to `~/.vep` by default). it is packaged for  If you were not able to set up tabix, then skip argument `--CONVERT` below:
 
-Test running VEP in offline mode with 4 parallel threads, on the provided example VCF:
+    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens --ASSEMBLY GRCh37 --CONVERT
+    perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens --ASSEMBLY GRCh38 --CONVERT
 
-    perl variant_effect_predictor.pl --offline --no_stats --everything --xref_refseq --check_existing --total_length --allele_number --no_escape --fork 4 --fasta ~/.vep --input_file example.vcf --output_file example.vep.txt
+Test running VEP in offline mode, on the provided sample GRCh38 VCF:
+
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --fasta ~/.vep --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
 
 Install snpEff
 --------------
@@ -78,15 +81,14 @@ Import the Ensembl v75 (Gencode v19) database for humans (writes to `snpEff/data
 
     java -Xmx4g -jar snpEff.jar download GRCh37.75
 
-Test running snpEff on a sample VCF:
+Test running snpEff on any available sample GRCh37 VCF:
 
-    java -Xmx4g -jar snpEff.jar eff -noStats -sequenceOntology -hgvs GRCh37.75 example.vcf > example.snpeff.vcf
+    java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh37.75 ~/vep/example_GRCh37.vcf > example_GRCh37.snpeff.vcf
 
 Authors
 -------
 
     Cyriac Kandoth (ckandoth@gmail.com)
-    William Lee, Senior Research Scientist, Memorial Sloan Kettering Cancer Center
 
 License
 -------

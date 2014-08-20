@@ -65,3 +65,8 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 84. ASN_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined Asian population
 85. EUR_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined European population
 86. PUBMED - pubmed ID(s) of publications that cite existing variant
+87. HGNC_ID - gene identifier from the HUGO Gene Nomenclature Committee
+88. SWISSPROT - UniProtKB/Swiss-Prot identifier of protein product
+89. TREMBL - UniProtKB/TrEMBL identifier of protein product
+90. UNIPARC - UniParc identifier of protein product
+91. SOMATIC - somatic status of existing variation(s)
