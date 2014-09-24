@@ -237,7 +237,7 @@ elsif( $input_vcf ) {
             }
 
             # Contruct VEP command using our chosen defaults and run it
-            my $vep_cmd = "perl -I /ifs/e63data/schultzlab/opt/perl5/lib/perl5 $vep_path/variant_effect_predictor.pl --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly GRCh37 --dir $vep_data --fasta $vep_data --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl -I /ifs/e63data/schultzlab/opt/perl5/lib/perl5 $vep_path/variant_effect_predictor.pl --fork 8 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $vep_data/homo_sapiens/76_$ncbi_build --vcf --input_file $input_vcf --output_file $vep_anno";
 
             system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
@@ -507,6 +507,9 @@ while( my $line = $vcf_fh->getline ) {
             # Remove transcript ID from HGVS codon/protein changes, to make it easier on the eye
             $effect{HGVSc} =~ s/^.*:// if( $effect{HGVSc} );
             $effect{HGVSp} =~ s/^.*:// if( $effect{HGVSp} );
+
+            # Remove the prefixed HGVSc code in HGVSp, if found
+            $effect{HGVSp} =~ s/^.*\((p\.\S+)\)/$1/ if( $effect{HGVSp} and $effect{HGVSp} =~ m/^c\./ );
 
             # Create a separate HGVS protein format using 1-letter codes
             my $hgvs_p_short = $effect{HGVSp};
