@@ -38,3 +38,4 @@ http://snpeff.sourceforge.net/SnpEff_manual.html#output
 57. Genotype_Number - Genotype number corresponding to this effect (e.g. '2' if the effect corresponds to the second ALT)
 58. ERRORS - Any errors (not shown if empty)
 59. WARNINGS - Any warnings (not shown if empty)
+60. HGVSp_Short - Same as HGVSp, but using 1-letter amino-acid codes

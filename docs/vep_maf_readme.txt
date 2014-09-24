@@ -70,3 +70,4 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 89. TREMBL - UniProtKB/TrEMBL identifier of protein product
 90. UNIPARC - UniParc identifier of protein product
 91. SOMATIC - somatic status of existing variation(s)
+92. HGVSp_Short - Same as HGVSp, but using 1-letter amino-acid codes
