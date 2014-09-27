@@ -172,7 +172,7 @@ __DATA__
 
 =head1 DESCRIPTION
 
-This script breaks down variants in a MAF into VCFs for each tumor-normal pair, im preparation for annotation with vcf2maf.
+This script breaks down variants in a MAF into VCFs for each tumor-normal pair, in preparation for annotation with vcf2maf
 
 =head2 Relevant links:
 
@@ -186,6 +186,6 @@ This script breaks down variants in a MAF into VCFs for each tumor-normal pair, 
 
 =head1 LICENSE
 
- LGPLv3, Memorial Sloan Kettering Cancer Center, New York, NY 10065, USA
+ LGPL v3 | GNU Lesser General Public License v3.0 | http://www.gnu.org/licenses/lgpl-3.0.html
 
 =cut

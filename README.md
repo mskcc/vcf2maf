@@ -92,15 +92,17 @@ Download the latest release of snpEff into your home directory:
     cd ~/
     curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
-    cd snpEff
 
-Import the Ensembl v75 (Gencode v19) database for humans (writes to `snpEff/data` by default):
+Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v76 (Gencode v20) for GRCh38 (writes to `snpEff/data` by default):
 
-    java -Xmx4g -jar snpEff.jar download GRCh37.75
+    cd ~/snpEff
+    java -Xmx2g -jar snpEff.jar download GRCh37.75
+    java -Xmx2g -jar snpEff.jar download GRCh38.76
 
-Test running snpEff on any available sample GRCh37 VCF:
+Test running snpEff on any available GRCh37 and GRCh38 VCFs:
 
     java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh37.75 ~/vep/example_GRCh37.vcf > example_GRCh37.snpeff.vcf
+    java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh38.76 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
 
 Authors
 -------
@@ -110,4 +112,4 @@ Authors
 License
 -------
 
-    LGPLv3, Memorial Sloan Kettering Cancer Center, New York, NY 10065, USA
+    LGPL v3 | GNU Lesser General Public License v3.0 | http://www.gnu.org/licenses/lgpl-3.0.html

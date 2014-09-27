@@ -9,9 +9,9 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
-my ( $vep_path, $vep_data ) = ( "~/vep", "~/.vep" );
-my ( $snpeff_path, $snpeff_data ) = ( "~/snpEff", "~/snpEff/data" );
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
+my ( $vep_path, $vep_data, $ref_fasta ) = ( "~/vep", "~/.vep", "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "~/snpEff", "~/snpEff/data", "GRCh37.75" );
 my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
@@ -165,8 +165,10 @@ GetOptions(
     'vcf-normal-id=s' => \$vcf_normal_id,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
+    'ref-fasta=s' => \$ref_fasta,
     'snpeff-path=s' => \$snpeff_path,
     'snpeff-data=s' => \$snpeff_data,
+    'snpeff-db=s' => \$snpeff_db,
     'ncbi-build=s' => \$ncbi_build,
     'maf-center=s' => \$maf_center,
     'min-hom-vaf=s' => \$min_hom_vaf
@@ -215,9 +217,9 @@ elsif( $input_vcf ) {
                 die "ERROR: Cannot find snpEff jar or config in path: $snpeff_path";
             }
 
-            # Contruct snpEff command using our chosen defaults and run it
-            my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs GRCh37.75 $input_vcf > $snpeff_anno";
-            system( $snpeff_cmd ) == 0 or die "ERROR: Failed to run the snpEff annotator!\nCommand: $snpeff_cmd\n";
+            # Contruct snpEff command using some default options and run it
+            my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs $snpeff_db $input_vcf > $snpeff_anno";
+            system( $snpeff_cmd ) == 0 or die "\nERROR: Failed to run the snpEff annotator!\nCommand: $snpeff_cmd\n";
             ( -s $snpeff_anno ) or warn "WARNING: snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
         }
     }
@@ -236,10 +238,10 @@ elsif( $input_vcf ) {
                 die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
             }
 
-            # Contruct VEP command using our chosen defaults and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $vep_data/homo_sapiens/76_$ncbi_build --vcf --input_file $input_vcf --output_file $vep_anno";
+            # Contruct VEP command using some default options and run it
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
 
-            system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
+            system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
         }
     }
@@ -738,9 +740,11 @@ __DATA__
  --use-snpeff     Use snpEff to annotate VCF, instead of the default VEP
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
  --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]
- --ncbi-build     NCBI Genome Reference Consortium human build ID to report in MAF [37]
+ --snpeff-db      Database version to use when running snpEff [GRCh37.75]
+ --ncbi-build     NCBI reference assembly ID to report in MAF [GRCh37]
  --maf-center     Variant calling center to report in MAF [.]
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --help           Print a brief help message and quit
@@ -748,16 +752,16 @@ __DATA__
 
 =head1 DESCRIPTION
 
-To convert a VCF into a MAF, each variant must be annotated to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect on a single transcript, per variant, is often subjective. So this script tries to follow best practices, but makes the selection criteria smarter, reproducible, and more configurable.
+To convert a VCF into a MAF, each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable.
 
-This script needs Ensembl's VEP or snpEff - variant annotators that can map the effect of a variant on all possible gene transcripts in a database. For more info, see the README.
+This script needs either VEP or snpEff - variant annotators that map effects of a variant on all possible genes and transcripts. For more info, see the README.
 
 =head2 Relevant links:
 
  Homepage: https://github.com/ckandoth/vcf2maf
  VCF format: http://samtools.github.io/hts-specs/
  MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
- Ensembl VEP: http://ensembl.org/info/docs/tools/vep/index.html
+ VEP: http://ensembl.org/info/docs/tools/vep/index.html
  VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
  snpEff: http://snpeff.sourceforge.net
  snpEff annotated VCF format: http://snpeff.sourceforge.net/SnpEff_manual.html#output
@@ -768,6 +772,6 @@ This script needs Ensembl's VEP or snpEff - variant annotators that can map the 
 
 =head1 LICENSE
 
- LGPLv3, Memorial Sloan Kettering Cancer Center, New York, NY 10065, USA
+ LGPL v3 | GNU Lesser General Public License v3.0 | http://www.gnu.org/licenses/lgpl-3.0.html
 
 =cut
