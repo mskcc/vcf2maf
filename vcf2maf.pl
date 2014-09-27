@@ -516,7 +516,7 @@ while( my $line = $vcf_fh->getline ) {
             # Create a separate HGVS protein format using 1-letter codes
             my $hgvs_p_short = $effect{HGVSp};
             while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
-                eval "\$hgvs_p_short =~ s{$find}{$replace}";
+                eval "\$hgvs_p_short =~ s{$find}{$replace}g";
             }
             $effect{HGVSp_Short} = $hgvs_p_short;
 
@@ -595,7 +595,7 @@ while( my $line = $vcf_fh->getline ) {
                 # Create a separate HGVS protein format using 1-letter codes
                 my $hgvs_p_short = $effect{HGVSp};
                 while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
-                    eval "\$hgvs_p_short =~ s{$find}{$replace}";
+                    eval "\$hgvs_p_short =~ s{$find}{$replace}g";
                 }
                 $effect{HGVSp_Short} = $hgvs_p_short;
 
