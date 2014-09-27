@@ -237,7 +237,7 @@ elsif( $input_vcf ) {
             }
 
             # Contruct VEP command using our chosen defaults and run it
-            my $vep_cmd = "perl -I /ifs/e63data/schultzlab/opt/perl5/lib/perl5 $vep_path/variant_effect_predictor.pl --fork 8 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $vep_data/homo_sapiens/76_$ncbi_build --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $vep_data/homo_sapiens/76_$ncbi_build --vcf --input_file $input_vcf --output_file $vep_anno";
 
             system( $vep_cmd ) == 0 or die "ERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
@@ -718,12 +718,12 @@ __DATA__
 
 =head1 NAME
 
- vcf2maf.pl - Map effects of variants in a given VCF, and report them in a MAF
+ vcf2maf.pl - Map effects of variants in a given single-sample VCF, and report them in a MAF
 
 =head1 SYNOPSIS
 
  perl vcf2maf.pl --help
- perl vcf2maf.pl --input-vcf test.vcf --output-maf test.maf --tumor-id WD4086 --normal-id NB4086
+ perl vcf2maf.pl --input-vcf WD4086.vcf --output-maf WD4086.maf --tumor-id WD4086 --normal-id NB4086
 
 =head1 OPTIONS
 
