@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# maf2vcf - Parse out variant loci and alleles from a MAF to create generic VCF files per TN-pair
+# maf2vcf - Reformat variants in a given MAF into generic VCFs with GT:AD:DP data if available
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
-my $ref_fasta = "~/.vep/homo_sapiens/75/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa";
+my $ref_fasta = "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa";
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 
@@ -28,17 +28,17 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 my ( $man, $help ) = ( 0, 0 );
 my ( $input_maf, $output_dir );
 GetOptions(
-    'help!'           => \$help,
-    'man!'            => \$man,
-    'input-maf=s'     => \$input_maf,
-    'output-dir=s'    => \$output_dir,
-    'ref-fasta=s'     => \$ref_fasta,
+    'help!' => \$help,
+    'man!' => \$man,
+    'input-maf=s' => \$input_maf,
+    'output-dir=s' => \$output_dir,
+    'ref-fasta=s' => \$ref_fasta,
     'tum-depth-col=s' => \$tum_depth_col,
-    'tum-rad-col=s'   => \$tum_rad_col,
-    'tum-vad-col=s'   => \$tum_vad_col,
+    'tum-rad-col=s' => \$tum_rad_col,
+    'tum-vad-col=s' => \$tum_vad_col,
     'nrm-depth-col=s' => \$nrm_depth_col,
-    'nrm-rad-col=s'   => \$nrm_rad_col,
-    'nrm-vad-col=s'   => \$nrm_vad_col
+    'nrm-rad-col=s' => \$nrm_rad_col,
+    'nrm-vad-col=s' => \$nrm_vad_col
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -149,7 +149,7 @@ __DATA__
 
 =head1 NAME
 
- maf2vcf.pl - Reformat variants in a given MAF, into generic VCFs with GT:AD:DP data if available
+ maf2vcf.pl - Reformat variants in a given MAF into generic VCFs with GT:AD:DP data if available
 
 =head1 SYNOPSIS
 
@@ -160,7 +160,7 @@ __DATA__
 
  --input-maf      Path to input file in MAF format
  --output-dir     Path to output directory where VCFs will be stored, one per TN-pair
- --ref-fasta      Path to reference Fasta file [~/.vep/homo_sapiens/75/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --ref-fasta      Path to reference Fasta file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --tum-depth-col  Name of MAF column for read depth in tumor BAM [t_depth]
  --tum-rad-col    Name of MAF column for reference allele depth in tumor BAM [t_ref_count]
  --tum-vad-col    Name of MAF column for variant allele depth in tumor BAM [t_alt_count]

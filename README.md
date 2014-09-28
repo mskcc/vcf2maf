@@ -49,11 +49,11 @@ Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/to
 
 On Ubuntu/Debian, sudoers can install VEP's pre-requisite packages like this:
 
-    sudo apt-get install -y curl rsync tabix libarchive-extract-perl libarchive-zip-perl libwww-perl libcgi-pm-perl libdbi-perl libdbd-mysql-perl
+    sudo apt-get install -y curl rsync samtools tabix libarchive-extract-perl libarchive-zip-perl libwww-perl libcgi-pm-perl libdbi-perl libdbd-mysql-perl
 
 On CentOS/Redhat/Fedora, here is how to install the equivalent packages:
 
-    sudo yum -y install curl rsync tabix perl-Archive-Extract perl-Archive-Zip perl-libwww-perl perl-CGI perl-DBI perl-DBD-mysql perl-Time-HiRes
+    sudo yum -y install curl rsync samtools tabix perl-Archive-Extract perl-Archive-Zip perl-libwww-perl perl-CGI perl-DBI perl-DBD-mysql perl-Time-HiRes
 
 Download the v76 release of VEP into your home directory:
 
