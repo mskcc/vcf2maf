@@ -14,12 +14,6 @@ my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_al
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $ref_fasta ) = ( "~/vep", "~/.vep", "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
 
-# Find out where samtools is installed, and warn the user if it's not
-my $samtools = ( -e "/opt/bin/samtools" ? "/opt/bin/samtools" : "/usr/bin/samtools" );
-$samtools = `which samtools` unless( -e $samtools );
-chomp( $samtools );
-( $samtools and -e $samtools ) or die "Please install samtools, and make sure it's in your PATH\n";
-
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
     pod2usage( -verbose => 0, -message => "$0: Missing or invalid arguments!\n", -exitval => 2 );
@@ -56,7 +50,7 @@ my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/v
 # Create a temporary directory for our intermediate files
 my $tmp_dir = tempdir( CLEANUP => 1 );
 
-# Contruct maf2vcf command and run it
+# Contruct a maf2vcf command and run it
 my $maf2vcf_cmd = "perl $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir --ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col --tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col --nrm-vad-col $nrm_vad_col";
 system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf!\nCommand: $maf2vcf_cmd\n";
 
