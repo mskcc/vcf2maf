@@ -60,10 +60,11 @@ while( my $line = $maf_fh->getline ) {
 
         # Fetch the column names and do some sanity checks
         map{ $col_idx{$_} = $idx; ++$idx; } @cols;
-        map{( defined $col_idx{$_} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode );
+        map{( defined $col_idx{$_} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
 
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
-        my $tn_idx = ( $col_idx{Tumor_Sample_Barcode} + 1 ) . "," . ( $col_idx{Matched_Norm_Sample_Barcode} + 1 );
+        my $tn_idx = $col_idx{Tumor_Sample_Barcode} + 1;
+        $tn_idx .= ( "," . ( $col_idx{Matched_Norm_Sample_Barcode} + 1 )) if( defined $col_idx{Matched_Norm_Sample_Barcode} );
         my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome" $input_maf | cut -f $tn_idx | sort -u`;
 
         # For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
