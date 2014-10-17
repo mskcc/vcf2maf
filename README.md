@@ -55,32 +55,37 @@ On CentOS/Redhat/Fedora, here is how to install the equivalent packages:
 
     sudo yum -y install curl rsync samtools tabix perl-Archive-Extract perl-Archive-Zip perl-libwww-perl perl-CGI perl-DBI perl-DBD-mysql perl-Time-HiRes
 
-Download the v76 release of VEP into your home directory:
+For convenience, create temporary shell variables pointing to where the VEP script and cache data will be stored (non default paths can be used too, but don't forget to specify `--vep-path` and `--vep-data` when running vcf2maf):
 
-    cd ~/
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/76.tar.gz
-    tar -zxf 76.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|vep/|g'
+    export VEP_PATH=~/vep
+    export VEP_DATA=~/.vep
 
-Download and unpack VEP's offline cache for GRCh37 and GRCh38 into `~/.vep` (default path that VEP looks in, but can be user-specified):
+Download the v77 release of VEP:
 
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-76/variation/VEP/homo_sapiens_vep_76_GRCh{37,38}.tar.gz ~/.vep/
-    cat ~/.vep/*.tar.gz | tar -izxf - -C ~/.vep
+    mkdir $VEP_PATH; cd $VEP_PATH
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/77.tar.gz
+    tar -zxf 77.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
 
-Install the Ensembl v76 API and download the reference FASTAs for GRCh37 and GRCh38:
+Download and unpack VEP's offline cache for GRCh37 and GRCh38:
 
-    cd ~/vep
-    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh37
-    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh38
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-77/variation/VEP/homo_sapiens_vep_77_GRCh{37,38}.tar.gz $VEP_DATA
+    cat $VEP_DATA/*.tar.gz | tar -izxf - -C $VEP_DATA
+
+Install the Ensembl v77 API and download the reference FASTAs for GRCh37 and GRCh38:
+
+    cd $VEP_PATH
+    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh37 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh38 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
-    perl convert_cache.pl --species homo_sapiens --version 76_GRCh37
-    perl convert_cache.pl --species homo_sapiens --version 76_GRCh38
+    perl convert_cache.pl --species homo_sapiens --version 77_GRCh37 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens --version 77_GRCh38 --dir $VEP_DATA
 
 Test running VEP in offline mode, on the provided sample GRCh37 and GRCh38 VCFs:
 
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --fasta ~/.vep/homo_sapiens/76_GRCh37 --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --fasta ~/.vep/homo_sapiens/76_GRCh38 --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/77_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA//homo_sapiens/77_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
 
 Install snpEff
 --------------
