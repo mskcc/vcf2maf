@@ -44,7 +44,7 @@ pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Parse through each variant in the MAF, and fill up the respective VCFs
-my $maf_fh = IO::File->new( $input_maf );
+my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
 my %col_idx = (); # Hash to map column names to column indexes
 while( my $line = $maf_fh->getline ) {
 
@@ -71,7 +71,7 @@ while( my $line = $maf_fh->getline ) {
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
         foreach my $pair ( @tn_pair ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
-            $n_id = "Undefined" unless( $n_id ); # Use a placeholder name for normal if its undefined
+            $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
             my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
             my $vcf_fh = IO::File->new( $vcf_file, ">" );
             $vcf_fh->print( "##fileformat=VCFv4.2\n" );
@@ -87,18 +87,17 @@ while( my $line = $maf_fh->getline ) {
     ( %col_idx ) or die "ERROR: Couldn't find a header line in the MAF: $input_maf";
 
     # For a variant in the MAF, parse out the bare minimum data needed by a VCF
-    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{( defined $col_idx{$_} ? $cols[$col_idx{$_}] : "" )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{$cols[$col_idx{$_}]} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
 
     # Parse out read counts for ref/var alleles, if available
-    my ( $t_dp, $t_rad, $t_vad ) = map{( defined $col_idx{$_} ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col );
-    my ( $n_dp, $n_rad, $n_vad ) = map{( defined $col_idx{$_} ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
+    my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{( defined $col_idx{$_} and $cols[$col_idx{$_}] ne "" ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
     # Normal sample ID could be undefined for legit reasons, but we need a placeholder name
-    $n_id = "Undefined" unless( $n_id );
+    $n_id = "NORMAL" unless( defined $n_id );
 
     # If normal alleles are unset in the MAF (quite common), assume homozygous reference
-    $n_al1 = $ref unless( $n_al1 );
-    $n_al2 = $ref unless( $n_al2 );
+    $n_al1 = $ref unless( defined $n_al1 );
+    $n_al2 = $ref unless( defined $n_al2 );
 
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );

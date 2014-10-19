@@ -55,7 +55,7 @@ On CentOS/Redhat/Fedora, here is how to install the equivalent packages:
 
     sudo yum -y install curl rsync samtools tabix perl-Archive-Extract perl-Archive-Zip perl-libwww-perl perl-CGI perl-DBI perl-DBD-mysql perl-Time-HiRes
 
-For convenience, create temporary shell variables pointing to where the VEP script and cache data will be stored (non default paths can be used too, but don't forget to specify `--vep-path` and `--vep-data` when running vcf2maf):
+Create temporary shell variables pointing to where we'll store VEP and its cache data (non default paths can be used, but specify `--vep-path` and `--vep-data` when running vcf2maf):
 
     export VEP_PATH=~/vep
     export VEP_DATA=~/.vep
@@ -85,7 +85,7 @@ Convert the offline cache for use with tabix, that significantly speeds up the l
 Test running VEP in offline mode, on the provided sample GRCh37 and GRCh38 VCFs:
 
     perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/77_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA//homo_sapiens/77_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/77_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
 
 Install snpEff
 --------------
@@ -117,4 +117,4 @@ Authors
 License
 -------
 
-    LGPL v3 | GNU Lesser General Public License v3.0 | http://www.gnu.org/licenses/lgpl-3.0.html
+    LGPL v3 | GNU Lesser General Public License v3.0 | http://gnu.org/licenses/lgpl-3.0.html

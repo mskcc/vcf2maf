@@ -66,13 +66,14 @@ sub GetEffectPriority {
         'regulatory_region_ablation' => 17, # A feature ablation whereby the deleted region includes a regulatory region
         'regulatory_region_amplification' => 17, # A feature amplification of a region containing a regulatory region
         'regulatory_region_variant' => 17, # A sequence variant located within a regulatory region
+        'regulatory_region' =>17, # snpEff-specific effect that should really be regulatory_region_variant
         'feature_elongation' => 18, # A sequence variant that causes the extension of a genomic feature, with regard to the reference sequence
         'feature_truncation' => 18, # A sequence variant that causes the reduction of a genomic feature, with regard to the reference sequence
         'intergenic_variant' => 19, # A sequence variant located in the intergenic region, between genes
-        'intergenic_region' => 19, # snpEff-specific effect that actually means intergenic_variant, but was named incorrectly
+        'intergenic_region' => 19, # snpEff-specific effect that should really be intergenic_variant
         '' => 20
     );
-    $effectPriority{$effect} or die "ERROR: Unrecognized effect \"$effect\". Please update your hashes!";
+    $effectPriority{$effect} or die "ERROR: Unrecognized effect \"$effect\". Please update your hashes!\n";
     return $effectPriority{$effect};
 }
 
@@ -138,7 +139,7 @@ sub GetBiotypePriority {
         'artifact' => 9, # Used to tag mistakes in the public databases (Ensembl/SwissProt/Trembl)
         '' => 9
     );
-    $biotype_priority{$biotype} or die "ERROR: Unrecognized biotype \"$biotype\". Please update your hashes!";
+    $biotype_priority{$biotype} or die "ERROR: Unrecognized biotype \"$biotype\". Please update your hashes!\n";
     return $biotype_priority{$biotype};
 }
 
@@ -211,10 +212,10 @@ elsif( $input_vcf ) {
             warn "WARNING: Annotated VCF already exists ($snpeff_anno). Skipping re-annotation.\n";
         }
         else {
-            warn "STATUS: Running snpEff on VCF, and writing output to: $snpeff_anno\n";
+            warn "STATUS: Running snpEff and writing to: $snpeff_anno\n";
             # Make sure we can find the snpEff jar file and config
             unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
-                die "ERROR: Cannot find snpEff jar or config in path: $snpeff_path";
+                die "ERROR: Cannot find snpEff jar or config in path: $snpeff_path\n";
             }
 
             # Contruct snpEff command using some default options and run it
@@ -232,14 +233,13 @@ elsif( $input_vcf ) {
             warn "WARNING: Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
         }
         else {
-            warn "STATUS: Running VEP on VCF, and writing output to: $vep_anno\n";
-            # Make sure we can find the VEP script
-            unless( glob "$vep_path/variant_effect_predictor.pl" ) {
-                die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path";
-            }
+            warn "STATUS: Running VEP and writing to: $vep_anno\n";
+            # Make sure we can find the VEP script and the reference FASTA
+            ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
+            ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
             # Contruct VEP command using some default options and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --no_progress --quiet --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
 
             system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
@@ -258,31 +258,30 @@ my @maf_header = qw(
     Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 Tumor_Validation_Allele1 Tumor_Validation_Allele2
     Match_Norm_Validation_Allele1 Match_Norm_Validation_Allele2 Verification_Status
     Validation_Status Mutation_Status Sequencing_Phase Sequence_Source Validation_Method Score
-    BAM_File Sequencer Tumor_Sample_UUID Matched_Norm_Sample_UUID HGVSc HGVSp Transcript_ID
+    BAM_File Sequencer Tumor_Sample_UUID Matched_Norm_Sample_UUID HGVSc HGVSp HGVSp_Short Transcript_ID
     Exon_Number t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count all_effects
 );
 
 # Add extra columns to the MAF depending on whether we used VEP or snpEff
 my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position
-    Protein_position Amino_acids Codons Existing_variation AA_MAF EA_MAF ALLELE_NUM RefSeq EXON
-    INTRON MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE DISTANCE STRAND CLIN_SIG CANONICAL
-    SYMBOL SYMBOL_SOURCE SIFT PolyPhen GMAF BIOTYPE ENSP DOMAINS CCDS HGVSc HGVSp AFR_MAF AMR_MAF
-    ASN_MAF EUR_MAF PUBMED HGNC_ID SWISSPROT TREMBL UNIPARC SOMATIC HGVSp_Short );
-
+    Protein_position Amino_acids Codons Existing_variation ALLELE_NUM DISTANCE STRAND SYMBOL
+    SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen
+    EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EUR_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED
+    MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE );
 my @vepcsq_cols_format; # To store the actual order of VEP data, that may differ between runs
 my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
     Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
-    Genotype_Number ERRORS WARNINGS HGVSp_Short );
+    Genotype_Number ERRORS WARNINGS );
 push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
 
 # Parse through each variant in the annotated VCF, pull out CSQ/EFF from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
-$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf! $!" if( $output_maf );
+$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
 my $vcf_file = ( $vep_anno ? $vep_anno : $snpeff_anno );
 ( -s $vcf_file ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $vcf_fh = IO::File->new( $vcf_file ) or die "ERROR: Couldn't open annotated VCF: $vcf_file! $!";
+my $vcf_fh = IO::File->new( $vcf_file ) or die "ERROR: Couldn't open annotated VCF: $vcf_file!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
@@ -513,6 +512,18 @@ while( my $line = $vcf_fh->getline ) {
             # Remove the prefixed HGVSc code in HGVSp, if found
             $effect{HGVSp} =~ s/^.*\((p\.\S+)\)/$1/ if( $effect{HGVSp} and $effect{HGVSp} =~ m/^c\./ );
 
+            # If there are several consequences listed for a transcript, choose the most severe one
+            ( $effect{Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( /,/, $effect{Consequence} );
+
+            # When VEP fails to provide any value in Consequence, tag it as an intergenic variant
+            $effect{Consequence} = "intergenic_variant" unless( $effect{Consequence} );
+
+            # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
+            if( $effect{Consequence} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
+                my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
+                $effect{HGVSp} = sprintf( "p.%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 ) if( defined $c_pos );
+            }
+
             # Create a separate HGVS protein format using 1-letter codes
             my $hgvs_p_short = $effect{HGVSp};
             while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
@@ -536,12 +547,6 @@ while( my $line = $vcf_fh->getline ) {
             # Transcript_Length isn't separately reported, but can be parsed out from cDNA_position
             ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/;
             $effect{Transcript_Length} = 0 unless( defined $effect{Transcript_Length} );
-
-            # If there are several consequences listed for a transcript, choose the most severe one
-            ( $effect{Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( /,/, $effect{Consequence} );
-
-            # When VEP fails to provide any value in Consequence, tag it as an intergenic variant
-            $effect{Consequence} = "intergenic_variant" unless( $effect{Consequence} );
 
             # Skip effects on other ALT alleles
             push( @all_effects, \%effect ) if( $effect{ALLELE_NUM} == $var_allele_idx );
@@ -592,6 +597,15 @@ while( my $line = $vcf_fh->getline ) {
                 $effect{HGVSc} = '' unless( $effect{HGVSc} );
                 $effect{HGVSp} = '' unless( $effect{HGVSp} );
 
+                # When snpEff fails to provide any value in Effect, tag it as an intergenic variant
+                $effect{Effect} = "intergenic_variant" unless( $effect{Effect} );
+
+                # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
+                if( $effect{Effect} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
+                    my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
+                    $effect{HGVSp} = sprintf( "p.%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 ) if( defined $c_pos );
+                }
+
                 # Create a separate HGVS protein format using 1-letter codes
                 my $hgvs_p_short = $effect{HGVSp};
                 while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
@@ -601,9 +615,6 @@ while( my $line = $vcf_fh->getline ) {
 
                 # Transcript length isn't reported, so we have to use AA length, where available
                 $effect{Amino_Acid_Length} = 0 unless( $effect{Amino_Acid_Length} );
-
-                # When snpEff fails to provide any value in Effect, tag it as an intergenic variant
-                $effect{Effect} = "intergenic_variant" unless( $effect{Effect} );
 
                 # Skip effects on other ALT alleles
                 push( @all_effects, \%effect ) if( $effect{Genotype_Number} == $var_allele_idx );
@@ -706,7 +717,7 @@ sub GetVariantClassification {
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
     return "3'UTR" if( $effect eq '3_prime_UTR_variant' );
-    return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|intergenic_variant|intergenic_region)$/ );
+    return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|regulatory_region|intergenic_variant|intergenic_region)$/ );
     return "5'Flank" if( $effect eq 'upstream_gene_variant' );
     return "3'Flank" if ( $effect eq 'downstream_gene_variant' );
 
