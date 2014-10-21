@@ -54,7 +54,8 @@ sub GetEffectPriority {
         '3_prime_UTR_variant' => 12, # A UTR variant of the 3' UTR
         'non_coding_exon_variant' => 13, # A sequence variant that changes non-coding exon sequence
         'non_coding_transcript_exon_variant' => 13, # snpEff-specific synonym for non_coding_exon_variant
-        'nc_transcript_variant' => 14, # A transcript variant of a non coding RNA
+        'non_coding_transcript_variant' => 14, # A transcript variant of a non coding RNA gene
+        'nc_transcript_variant' => 14, # A transcript variant of a non coding RNA gene (older alias for non_coding_transcript_variant)
         'intron_variant' => 14, # A transcript variant occurring within an intron
         'INTRAGENIC' => 14, # snpEff-specific effect where the variant hits a gene without transcripts??
         'NMD_transcript_variant' => 15, # A variant in a transcript that is the target of NMD
@@ -106,6 +107,7 @@ sub GetBiotypePriority {
         '3prime_overlapping_ncrna' => 5, # Transcripts where ditag and/or published experimental data strongly supports the existence of short non-coding transcripts transcribed from the 3'UTR
         'misc_RNA' => 5, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'non_coding' => 5, # Transcript which is known from the literature to not be protein coding
+        'regulatory_region' => 6, # A region of sequence that is involved in the control of a biological process
         'disrupted_domain' => 6, # Otherwise viable coding region omitted from this alternatively spliced transcript because the splice variation affects a region coding for a protein domain
         'processed_transcript' => 6, # Doesn't contain an ORF
         'TEC' => 6, # To be Experimentally Confirmed. This is used for non-spliced EST clusters that have polyA features. This category has been specifically created for the ENCODE project to highlight regions that could indicate the presence of protein coding genes that require experimental validation, either by 5' RACE or RT-PCR to extend the transcripts, or by confirming expression of the putatively-encoded peptide with specific antibodies
@@ -714,7 +716,7 @@ sub GetVariantClassification {
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
     return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC)$/ );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
-    return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|nc_transcript_variant)$/ );
+    return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
     return "3'UTR" if( $effect eq '3_prime_UTR_variant' );
     return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|regulatory_region|intergenic_variant|intergenic_region)$/ );
