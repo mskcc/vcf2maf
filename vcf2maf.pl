@@ -561,21 +561,18 @@ while( my $line = $vcf_fh->getline ) {
             $b->{Transcript_Length} <=> $a->{Transcript_Length}
         } @all_effects;
 
-        # For the MAF, we will report the effect on the canonical transcript of the first priority gene
-        my $maf_gene = $all_effects[0]->{SYMBOL};
-        if( $maf_gene ) {
-            ( $maf_effect ) = grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects;
-            # If that gene had no canonical transcript tagged, choose the longest transcript instead
-            unless( $maf_effect ) {
-                ( $maf_effect ) = sort { $b->{Transcript_Length} <=> $a->{Transcript_Length} } grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene } @all_effects;
-            }
-        }
-        # If the top priority effect doesn't have a gene name, then use the first one that does
-        else {
-            ( $maf_effect ) = grep { $_->{SYMBOL} } @all_effects;
-            # If none of the effects have a gene name, just choose the first one
-            $maf_effect = $all_effects[0] unless( $maf_effect );
-        }
+        # Find the highest priority effect with a gene symbol (usually the first one)
+        my ( $effect_with_gene_name ) = grep { $_->{SYMBOL} } @all_effects;
+        my $maf_gene = $effect_with_gene_name->{SYMBOL} if( $effect_with_gene_name );
+
+        # Find the effect on the canonical transcript of that highest priority gene
+        ( $maf_effect ) = grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects;
+
+        # If that gene has no canonical transcript tagged, choose the highest priority canonical effect on any gene
+        ( $maf_effect ) = grep { $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects unless( $maf_effect );
+
+        # If none of the effects are tagged as canonical, then just report the top priority effect
+        $maf_effect = $all_effects[0] unless( $maf_effect );
     }
 
     ### Parsing snpEff effects
@@ -630,17 +627,12 @@ while( my $line = $vcf_fh->getline ) {
             $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length}
         } @all_effects;
 
-        # For the MAF, we will report the effect on the longest transcript of the first priority gene
-        my $maf_gene = $all_effects[0]->{Gene_Name};
-        if( $maf_gene ) {
-            ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects;
-        }
-        # If the top priority effect doesn't have a gene name, then use the first one that does
-        else {
-            ( $maf_effect ) = grep { $_->{Gene_Name} } @all_effects;
-            # If none of the effects have a gene name, just choose the first one
-            $maf_effect = $all_effects[0] unless( $maf_effect );
-        }
+        # Find the highest priority effect with a gene symbol (usually the first one)
+        my ( $effect_with_gene_name ) = grep { $_->{Gene_Name} } @all_effects;
+        my $maf_gene = $effect_with_gene_name->{Gene_Name} if( $effect_with_gene_name );
+
+        # Find the effect on the longest transcript of that highest priority gene
+        ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects;
     }
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
