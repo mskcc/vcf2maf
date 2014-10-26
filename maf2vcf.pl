@@ -58,13 +58,13 @@ while( my $line = $maf_fh->getline ) {
     if( $line =~ m/^(Hugo_Symbol|Chromosome)/ ) {
         my $idx = 0;
 
-        # Fetch the column names and do some sanity checks
-        map{ $col_idx{$_} = $idx; ++$idx; } @cols;
-        map{( defined $col_idx{$_} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
+        # Fetch the column names and do some sanity checks (don't be case-sensitive)
+        map{ my $c = lc; $col_idx{$c} = $idx; ++$idx; } @cols;
+        map{ my $c = lc; ( defined $col_idx{$c} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
 
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
-        my $tn_idx = $col_idx{Tumor_Sample_Barcode} + 1;
-        $tn_idx .= ( "," . ( $col_idx{Matched_Norm_Sample_Barcode} + 1 )) if( defined $col_idx{Matched_Norm_Sample_Barcode} );
+        my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
+        $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
         my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome" $input_maf | cut -f $tn_idx | sort -u`;
 
         # For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
@@ -87,10 +87,10 @@ while( my $line = $maf_fh->getline ) {
     ( %col_idx ) or die "ERROR: Couldn't find a header line in the MAF: $input_maf";
 
     # For a variant in the MAF, parse out the bare minimum data needed by a VCF
-    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{( defined $col_idx{$_} ? $cols[$col_idx{$_}] : undef )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : undef )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
 
     # Parse out read counts for ref/var alleles, if available
-    my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{(( defined $col_idx{$_} and defined $cols[$col_idx{$_}] and $cols[$col_idx{$_}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$_}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
+    my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{my $c = lc; (( defined $col_idx{$c} and defined $cols[$col_idx{$c}] and $cols[$col_idx{$c}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$c}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
     # Normal sample ID could be undefined for legit reasons, but we need a placeholder name
     $n_id = "NORMAL" unless( $n_id );
