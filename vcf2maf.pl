@@ -57,7 +57,8 @@ sub GetEffectPriority {
         'non_coding_transcript_variant' => 14, # A transcript variant of a non coding RNA gene
         'nc_transcript_variant' => 14, # A transcript variant of a non coding RNA gene (older alias for non_coding_transcript_variant)
         'intron_variant' => 14, # A transcript variant occurring within an intron
-        'INTRAGENIC' => 14, # snpEff-specific effect where the variant hits a gene without transcripts??
+        'intragenic_variant' => 14, # A variant that occurs within a gene but falls outside of all transcript features. This occurs when alternate transcripts of a gene do not share overlapping sequence
+        'INTRAGENIC' => 14, # snpEff-specific synonym of intragenic_variant
         'NMD_transcript_variant' => 15, # A variant in a transcript that is the target of NMD
         'upstream_gene_variant' => 16, # A sequence variant located 5' of a gene
         'downstream_gene_variant' => 16, # A sequence variant located 3' of a gene
@@ -706,7 +707,7 @@ sub GetVariantClassification {
     return "In_Frame_Ins" if( $effect eq 'inframe_insertion' );
     return "In_Frame_Del" if( $effect eq 'inframe_deletion' );
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
-    return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC)$/ );
+    return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC|intragenic_variant)$/ );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
