@@ -21,12 +21,13 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 
 # Parse options and print usage syntax on a syntax error, or if help was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
-my ( $input_maf, $output_maf );
+my ( $input_maf, $output_maf, $tmp_dir );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
     'input-maf=s' => \$input_maf,
     'output-maf=s' => \$output_maf,
+    'tmp-dir=s' => \$tmp_dir,
     'tum-depth-col=s' => \$tum_depth_col,
     'tum-rad-col=s' => \$tum_rad_col,
     'tum-vad-col=s' => \$tum_vad_col,
@@ -47,8 +48,8 @@ my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/v
 ( -s $maf2vcf_path ) or die "Couldn't locate maf2vcf.pl script! Must be in the same folder as maf2maf.pl\n";
 ( -s $vcf2maf_path ) or die "Couldn't locate vcf2maf.pl script! Must be in the same folder as maf2maf.pl\n";
 
-# Create a temporary directory for our intermediate files
-my $tmp_dir = tempdir( CLEANUP => 1 );
+# Create a temporary directory for our intermediate files, unless the user wants to use their own
+$tmp_dir = tempdir( CLEANUP => 1 ) unless( $tmp_dir );
 
 # Contruct a maf2vcf command and run it
 my $maf2vcf_cmd = "perl $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir --ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col --tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col --nrm-vad-col $nrm_vad_col";
@@ -94,6 +95,7 @@ __DATA__
 
  --input-maf      Path to input file in MAF format
  --output-maf     Path to output MAF file [Default: STDOUT]
+ --tmp-dir        Folder to retain intermediate VCFs/MAFs after runtime [Default: usually under /tmp]
  --tum-depth-col  Name of MAF column for read depth in tumor BAM [t_depth]
  --tum-rad-col    Name of MAF column for reference allele depth in tumor BAM [t_ref_count]
  --tum-vad-col    Name of MAF column for variant allele depth in tumor BAM [t_alt_count]
