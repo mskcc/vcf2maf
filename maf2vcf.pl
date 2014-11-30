@@ -75,7 +75,7 @@ while( my $line = $maf_fh->getline ) {
             my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
             my $vcf_fh = IO::File->new( $vcf_file, ">" );
             $vcf_fh->print( "##fileformat=VCFv4.2\n" );
-            $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\"\n" );
+            $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
             $vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
             $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
             $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
