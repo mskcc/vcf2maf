@@ -16,7 +16,7 @@ my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
-    Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V );
+    Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Ter * );
 
 # Prioritize Sequence Ontology terms from VEP/snpEff in order of severity, as estimated by Ensembl:
 # http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
