@@ -14,7 +14,7 @@ use File::Copy qw( move );
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $ref_fasta ) = ( "~/vep", "~/.vep", "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
-my $retain_cols = "Entrez_Gene_Id,Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase,Sequence_Source,Validation_Method,Score,BAM_file,Sequencer,Tumor_Sample_UUID,Matched_Norm_Sample_UUID";
+my $retain_cols = "Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase,Sequence_Source,Validation_Method,Score,BAM_file,Sequencer,Tumor_Sample_UUID,Matched_Norm_Sample_UUID";
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
