@@ -524,7 +524,10 @@ while( my $line = $vcf_fh->getline ) {
             # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
             if( $effect{Consequence} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
                 my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
-                $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 ) if( defined $c_pos );
+                if( defined $c_pos ) {
+                    $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
+                    $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 );
+                }
             }
 
             # Create a separate HGVS protein format using 1-letter codes
@@ -603,7 +606,10 @@ while( my $line = $vcf_fh->getline ) {
                 # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
                 if( $effect{Effect} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
                     my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
-                    $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 ) if( defined $c_pos );
+                    if( defined $c_pos ) {
+                        $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
+                        $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 );
+                    }
                 }
 
                 # Create a separate HGVS protein format using 1-letter codes
