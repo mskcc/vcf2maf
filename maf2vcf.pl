@@ -45,6 +45,7 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Parse through each variant in the MAF, and fill up the respective VCFs
 my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
+my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
 while( my $line = $maf_fh->getline ) {
 
@@ -60,7 +61,8 @@ while( my $line = $maf_fh->getline ) {
 
         # Fetch the column names and do some sanity checks (don't be case-sensitive)
         map{ my $c = lc; $col_idx{$c} = $idx; ++$idx; } @cols;
-        map{ my $c = lc; ( defined $col_idx{$c} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
+        map{ my $c = lc; ( defined $col_idx{$c} ) or die "ERROR: $_ is a required MAF column!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Sample_Barcode );
+        ( defined $col_idx{tumor_seq_allele1} or defined $col_idx{tumor_seq_allele2} ) or die "ERROR: At least one MAF column for Tumor_Seq_Allele must be defined!\n";
 
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
         my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
@@ -84,7 +86,9 @@ while( my $line = $maf_fh->getline ) {
         next;
     }
 
+    # Print an error if we got to this point without parsing a header line, and increment a counter for all non-header lines
     ( %col_idx ) or die "ERROR: Couldn't find a header line in the MAF: $input_maf";
+    $line_count++;
 
     # For a variant in the MAF, parse out the bare minimum data needed by a VCF
     my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : undef )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
@@ -162,6 +166,9 @@ while( my $line = $maf_fh->getline ) {
     $vcf_fh->close;
 }
 $maf_fh->close;
+
+# Make sure that we handled a positive non-zero number of lines in the MAF
+( $line_count > 0 ) or die "ERROR: No variant lines in the input MAF!\n";
 
 __DATA__
 
