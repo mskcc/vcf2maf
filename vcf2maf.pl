@@ -366,6 +366,18 @@ while( my $line = $vcf_fh->getline ) {
         elsif( defined $tum_info{AO} and defined $tum_info{RO} ) {
             @tum_depths = ( $tum_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AO} ));
         }
+        # Handle VCF lines with ALT allele-frac in FA, which needs to be multiplied by DP to get AD
+        elsif( defined $tum_info{FA} and defined $tum_info{DP} and $tum_info{DP} ne '.' ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @tum_depths = map{""} @alleles;
+            $tum_depths[$var_allele_idx] = sprintf( "%.0f", $tum_info{FA} * $tum_info{DP} );
+        }
+        # Handle VCF lines where AD contains only 1 value, that we can assume is the variant allele
+        elsif( defined $tum_info{AD} and @tum_depths and scalar( @tum_depths ) == 1 ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @tum_depths = map{""} @alleles;
+            $tum_depths[$var_allele_idx] = $tum_info{AD};
+        }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @tum_depths and $#tum_depths != $#alleles ) {
             warn "WARNING: Unusual AD format for alleles $ref,$alt in $format_line = " . $rest[$vcf_tumor_idx] . "\n";
@@ -446,6 +458,18 @@ while( my $line = $vcf_fh->getline ) {
         # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
         elsif( defined $nrm_info{AO} and defined $nrm_info{RO} ) {
             @nrm_depths = ( $nrm_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $nrm_info{AO} ));
+        }
+        # Handle VCF lines with ALT allele-frac in FA, which needs to be multiplied by DP to get AD
+        elsif( defined $nrm_info{FA} and defined $nrm_info{DP} and $nrm_info{DP} ne '.' ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @nrm_depths = map{""} @alleles;
+            $nrm_depths[$var_allele_idx] = sprintf( "%.0f", $nrm_info{FA} * $nrm_info{DP} );
+        }
+        # Handle VCF lines where AD contains only 1 value, that we can assume is the variant allele
+        elsif( defined $nrm_info{AD} and @nrm_depths and scalar( @nrm_depths ) == 1 ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @nrm_depths = map{""} @alleles;
+            $nrm_depths[$var_allele_idx] = $nrm_info{AD};
         }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @nrm_depths and $#nrm_depths != $#alleles ) {
