@@ -353,9 +353,17 @@ while( my $line = $vcf_fh->getline ) {
             @tum_depths = map{(( defined $b_idx{$_} and defined $bcount[$b_idx{$_}] ) ? $bcount[$b_idx{$_}] : "" )} @alleles;
         }
         # Handle VCF SNV lines by Strelka, where allele depths are in AU:CU:GU:TU
-        # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
         elsif( scalar( grep{defined $tum_info{$_}} qw/AU CU GU TU/ ) == 4 ) {
-            @tum_depths = map{( split /,/, ( defined $tum_info{$_.'U'} ? $tum_info{$_.'U'} : "" ))[0]} @alleles;
+            # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
+            map{( $tum_info{$_.'U'} ) = split( ",", $tum_info{$_.'U'} )} qw( A C G T );
+
+            # If the ALT allele is just N, then set it to the allele with the highest non-ref readcount
+            if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
+                my %acgt_depths = map{( defined $tum_info{$_.'U'} ? ( $_, $tum_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
+                my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
+                ( $alleles[1] ) = ( $deepest[0] ne $ref ? $deepest[0] : $deepest[1] );
+            }
+            @tum_depths = map{( defined $tum_info{$_.'U'} ? $tum_info{$_.'U'} : "" )} @alleles;
         }
         # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
         elsif( $tum_info{TIR} ) {
@@ -446,9 +454,17 @@ while( my $line = $vcf_fh->getline ) {
             @nrm_depths = map{(( defined $b_idx{$_} and defined $bcount[$b_idx{$_}] ) ? $bcount[$b_idx{$_}] : "" )} @alleles;
         }
         # Handle VCF SNV lines by Strelka, where allele depths are in AU:CU:GU:TU
-        # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
         elsif( scalar( grep{defined $nrm_info{$_}} qw/AU CU GU TU/ ) == 4 ) {
-            @nrm_depths = map{( split /,/, ( defined $nrm_info{$_.'U'} ? $nrm_info{$_.'U'} : "" ))[0]} @alleles;
+            # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
+            map{( $nrm_info{$_.'U'} ) = split( ",", $nrm_info{$_.'U'} )} qw( A C G T );
+
+            # If the ALT allele is just N, then set it to the allele with the highest non-ref readcount
+            if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
+                my %acgt_depths = map{( defined $nrm_info{$_.'U'} ? ( $_, $nrm_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
+                my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
+                ( $alleles[1] ) = ( $deepest[0] ne $ref ? $deepest[0] : $deepest[1] );
+            }
+            @nrm_depths = map{( defined $nrm_info{$_.'U'} ? $nrm_info{$_.'U'} : "" )} @alleles;
         }
         # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
         elsif( $nrm_info{TIR} ) {
