@@ -9,7 +9,7 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 use File::Temp qw( tempdir );
 use File::Copy qw( move );
-use File::Path qw( make_path remove_tree );
+use File::Path qw( mkpath rmtree );
 
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
@@ -73,8 +73,8 @@ my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/v
 
 # Create a temporary directory for our intermediate files, unless the user wants to use their own
 if( $tmp_dir ) {
-    remove_tree( $tmp_dir );
-    make_path( $tmp_dir );
+    rmtree( $tmp_dir );
+    mkpath( $tmp_dir );
 }
 else {
     $tmp_dir = tempdir( CLEANUP => 1 );
