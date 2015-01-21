@@ -10,7 +10,7 @@ use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $ref_fasta ) = ( "~/vep", "~/.vep", "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "~/vep", "~/.vep", 4, "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
 my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "~/snpEff", "~/snpEff/data", "GRCh37.75" );
 my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 
@@ -169,6 +169,7 @@ GetOptions(
     'vcf-normal-id=s' => \$vcf_normal_id,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
+    'vep-forks=s' => \$vep_forks,
     'ref-fasta=s' => \$ref_fasta,
     'snpeff-path=s' => \$snpeff_path,
     'snpeff-data=s' => \$snpeff_data,
@@ -242,7 +243,7 @@ elsif( $input_vcf ) {
             ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
             # Contruct VEP command using some default options and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --quiet --fork 4 --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --quiet --fork $vep_forks --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
 
             system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
@@ -792,6 +793,7 @@ __DATA__
  --use-snpeff     Use snpEff to annotate VCF, instead of the default VEP
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
+ --vep-forks      Number of forked processes to use when running VEP [4]
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
  --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]

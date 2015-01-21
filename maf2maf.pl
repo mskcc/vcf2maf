@@ -14,7 +14,7 @@ use File::Path qw( mkpath rmtree );
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
-my ( $vep_path, $vep_data, $ref_fasta ) = ( "~/vep", "~/.vep",
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "~/vep", "~/.vep", 4,
     "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
 
 # Columns that can be safely borrowed from the input MAF
@@ -59,6 +59,7 @@ GetOptions(
     'retain-cols=s' => \$retain_cols,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
+    'vep-forks=s' => \$vep_forks,
     'ref-fasta=s' => \$ref_fasta,
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
@@ -95,7 +96,7 @@ foreach my $tn_vcf ( @vcfs ) {
     $tn_maf =~ s/.vcf$/.vep.maf/;
     my $vcf2maf_cmd = "perl $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf " .
         "--tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data " .
-        "--ref-fasta $ref_fasta";
+        "--vep-forks $vep_forks --ref-fasta $ref_fasta";
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf!\nCommand: $vcf2maf_cmd\n";
 }
 
@@ -231,6 +232,7 @@ __DATA__
  --retain-cols    Comma-delimited list of columns to retain from the input MAF [Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase,Sequence_Source,Validation_Method,Score,BAM_file,Sequencer,Tumor_Sample_UUID,Matched_Norm_Sample_UUID]
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
+ --vep-forks      Number of forked processes to use when running VEP [4]
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
