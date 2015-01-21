@@ -1,6 +1,8 @@
 vcf2maf
 =======
 
+[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.14107.svg)](http://dx.doi.org/10.5281/zenodo.14107)
+
 To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean towards best practices. Per the current defaults, a single affected transcript is selected per variant, as follows:
  1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L81), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L24), and finally by decreasing transcript length
  2. Pick the gene on the top of the list (worst-affected), and choose it's [canonical](http://www.ensembl.org/Help/Glossary?id=346) transcript (VEP picks the longest [CCDS](http://www.ncbi.nlm.nih.gov/CCDS/) isoform)
@@ -98,16 +100,16 @@ Download the latest release of snpEff into your home directory:
     curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
 
-Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v76 (Gencode v20) for GRCh38 (writes to `snpEff/data` by default):
+Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v78 (Gencode v21) for GRCh38 (writes to `snpEff/data` by default):
 
     cd ~/snpEff
     java -Xmx2g -jar snpEff.jar download GRCh37.75
-    java -Xmx2g -jar snpEff.jar download GRCh38.76
+    java -Xmx2g -jar snpEff.jar download GRCh38.78
 
 Test running snpEff on any available GRCh37 and GRCh38 VCFs:
 
     java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh37.75 ~/vep/example_GRCh37.vcf > example_GRCh37.snpeff.vcf
-    java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh38.76 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
+    java -Xmx4g -jar snpEff.jar eff -sequenceOntology -hgvs GRCh38.78 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
 
 Authors
 -------
