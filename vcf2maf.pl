@@ -16,7 +16,7 @@ my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
-    Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Ter * );
+    Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Xxx X Ter * );
 
 # Prioritize Sequence Ontology terms from VEP/snpEff in order of severity, as estimated by Ensembl:
 # http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
@@ -562,21 +562,33 @@ while( my $line = $vcf_fh->getline ) {
             # When VEP fails to provide any value in Consequence, tag it as an intergenic variant
             $effect{Consequence} = "intergenic_variant" unless( $effect{Consequence} );
 
-            # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
+            # Create a shorter HGVS protein format using 1-letter codes
+            if( $effect{HGVSp} ) {
+                my $hgvs_p_short = $effect{HGVSp};
+                while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
+                    eval "\$hgvs_p_short =~ s{$find}{$replace}g";
+                }
+                $effect{HGVSp_Short} = $hgvs_p_short;
+            }
+
+            # Fix HGVSp_Short, CDS_position, and Protein_position for splice acceptor/donor variants
             if( $effect{Consequence} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
                 my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
                 if( defined $c_pos ) {
                     $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
-                    $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 );
+                    my $p_pos = sprintf( "%.0f", ( $c_pos + $c_pos % 3 ) / 3 );
+                    $effect{HGVSp_Short} = "p.X" . $p_pos . "_splice";
+                    $effect{CDS_position} =~ s/^-(\/\d+)$/$c_pos$1/;
+                    $effect{Protein_position} =~ s/^-(\/\d+)$/$p_pos$1/;
                 }
             }
 
-            # Create a separate HGVS protein format using 1-letter codes
-            my $hgvs_p_short = $effect{HGVSp};
-            while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
-                eval "\$hgvs_p_short =~ s{$find}{$replace}g";
+            # Fix HGVSp_Short for Silent mutations, so it mentions the amino-acid and position
+            if( $effect{Consequence} eq "synonymous_variant" ) {
+                my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)\/\d+$/;
+                my $aa = $effect{Amino_acids};
+                $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
             }
-            $effect{HGVSp_Short} = $hgvs_p_short;
 
             # Copy VEP CSQ data into MAF fields that don't share the same identifier
             $effect{Transcript_ID} = $effect{Feature};
@@ -644,21 +656,33 @@ while( my $line = $vcf_fh->getline ) {
                 # When snpEff fails to provide any value in Effect, tag it as an intergenic variant
                 $effect{Effect} = "intergenic_variant" unless( $effect{Effect} );
 
-                # Provide an AA position in HGVSp for splice acceptor/donor variants (HGVS deviant)
+                # Create a shorter HGVS protein format using 1-letter codes
+                if( $effect{HGVSp} ) {
+                    my $hgvs_p_short = $effect{HGVSp};
+                    while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
+                        eval "\$hgvs_p_short =~ s{$find}{$replace}g";
+                    }
+                    $effect{HGVSp_Short} = $hgvs_p_short;
+                }
+
+                # Fix HGVSp_Short, CDS_position, and Protein_position for splice acceptor/donor variants
                 if( $effect{Effect} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
                     my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
                     if( defined $c_pos ) {
                         $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
-                        $effect{HGVSp} = sprintf( "p.X%.0f_splice", ( $c_pos + $c_pos % 3 ) / 3 );
+                        my $p_pos = sprintf( "%.0f", ( $c_pos + $c_pos % 3 ) / 3 );
+                        $effect{HGVSp_Short} = "p.X" . $p_pos . "_splice";
+                        $effect{CDS_position} =~ s/^-(\/\d+)$/$c_pos$1/;
+                        $effect{Protein_position} =~ s/^-(\/\d+)$/$p_pos$1/;
                     }
                 }
 
-                # Create a separate HGVS protein format using 1-letter codes
-                my $hgvs_p_short = $effect{HGVSp};
-                while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
-                    eval "\$hgvs_p_short =~ s{$find}{$replace}g";
+                # Fix HGVSp_Short for Silent mutations, so it mentions the amino-acid and position
+                if( $effect{Effect} eq "synonymous_variant" ) {
+                    my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)\/\d+$/;
+                    my $aa = $effect{Amino_acids};
+                    $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
                 }
-                $effect{HGVSp_Short} = $hgvs_p_short;
 
                 # Transcript length isn't reported, so we have to use AA length, where available
                 $effect{Amino_Acid_Length} = 0 unless( $effect{Amino_Acid_Length} );
