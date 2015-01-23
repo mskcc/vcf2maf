@@ -273,12 +273,15 @@ my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EUR_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED
     MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE );
 my @vepcsq_cols_format; # To store the actual order of VEP data, that may differ between runs
-my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
-    Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
-    Genotype_Number ERRORS WARNINGS );
+# my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
+#     Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
+#     Genotype_Number ERRORS WARNINGS );
+my @snpeff_cols = qw( Allele Annotation Annotation_Impact Gene_Name Gene_ID Feature_Type 
+    Feature_ID Transcript_BioType Rank HGVS_c HGVS_p cDNA_pos_length CDS_pos_length AA_pos_length 
+    Distance ERRORS_WARNINGS_INFO );
 push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
 
-# Parse through each variant in the annotated VCF, pull out CSQ/EFF from the INFO column, and choose
+# Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
@@ -633,23 +636,24 @@ while( my $line = $vcf_fh->getline ) {
     }
 
     ### Parsing snpEff effects
-    # INFO:EFF is a comma-delimited list of snpEff effects, with pipe-delim details per effect
-    # But note the parentheses, the Effect defined separately, and the last two columns being optional
-    # Only AA lengths for coding transcripts are provided. So we're SOL for non-coding transcripts
+    # INFO:ANN is a comma-delimited list of snpEff effects, with pipe-delim details per effect
+    # Functional annotations: 'Allele | Annotation | Annotation_Impact | Gene_Name | Gene_ID | Feature_Type | Feature_ID | Transcript_BioType | Rank | HGVS.c | HGVS.p | cDNA.pos / cDNA.length | CDS.pos / CDS.length | AA.pos / AA.length | Distance | ERRORS / WARNINGS / INFO'
+
     # EFF = Effect ( Effect_Impact | Functional_Class | Codon_Change | Amino_Acid_Change | Amino_Acid_Length | Gene_Name | Transcript_BioType | Gene_Coding | Transcript_ID | Exon_Rank  | Genotype_Number [ | ERRORS | WARNINGS ] ) , ...
-    elsif( $info{EFF} ) {
+    elsif( $info{ANN} ) {
 
-        foreach my $eff_line ( split( /,/, $info{EFF} )) {
-            if( $eff_line =~ /^(\w+)\((.+)\)$/ ) {
+        foreach my $ann_line ( split( /,/, $info{ANN} )) {
+#		print "$ann_line\n"; # debug
                 my $idx = 0;
-                my %effect = map{( $snpeff_cols[$idx++], ( defined $_ ? $_ : '' ))} ( $1, split( /\|/, $2 ));
+                my %effect = map{( $snpeff_cols[$idx++], ( defined $_ ? $_ : '' ))} split( /\|/, $ann_line );
 
-                # Copy snpEff EFF data into MAF fields that don't share the same identifier
-                $effect{Exon_Number} = $effect{Exon_Rank};
+                # Copy snpEff ANN data into MAF fields that don't share the same identifier
+                $effect{Exon_Number} = $effect{Rank};
                 $effect{Hugo_Symbol} = ( $effect{Gene_Name} ? $effect{Gene_Name} : '' );
 
                 # HGVS formatted codon/protein changes need to be parsed out of Amino_Acid_Change
-                ( $effect{HGVSp}, $effect{HGVSc} ) = $effect{Amino_Acid_Change} =~ m/^(.*)\/(.*)$/;
+                $effect{HGVSp} = $effect{HGVS_p};
+		$effect{HGVSc} = $effect{HGVS_c};
                 $effect{HGVSc} = '' unless( $effect{HGVSc} );
                 $effect{HGVSp} = '' unless( $effect{HGVSp} );
 
@@ -688,8 +692,7 @@ while( my $line = $vcf_fh->getline ) {
                 $effect{Amino_Acid_Length} = 0 unless( $effect{Amino_Acid_Length} );
 
                 # Skip effects on other ALT alleles
-                push( @all_effects, \%effect ) if( $effect{Genotype_Number} == $var_allele_idx );
-            }
+                push( @all_effects, \%effect ) if( $effect{Allele} eq $alleles[$var_allele_idx] );
         }
 
         # Sort effects first by transcript biotype, then by severity, and then by longest transcript
