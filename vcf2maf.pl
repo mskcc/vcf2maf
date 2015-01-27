@@ -277,7 +277,7 @@ my @vepcsq_cols_format; # To store the actual order of VEP data, that may differ
 #     Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
 #     Genotype_Number ERRORS WARNINGS );
 my @snpeff_cols = qw( Allele Annotation Annotation_Impact Gene_Name Gene_ID Feature_Type 
-    Feature_ID Transcript_BioType Rank HGVS_c HGVS_p cDNA_pos_length CDS_pos_length AA_pos_length 
+    Feature_ID Transcript_BioType Rank HGVS_c HGVS_p cDNA_position CDS_position AA_position 
     Distance ERRORS_WARNINGS_INFO );
 push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
 
