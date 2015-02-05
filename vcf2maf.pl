@@ -387,6 +387,12 @@ while( my $line = $vcf_fh->getline ) {
             @tum_depths = map{""} @alleles;
             $tum_depths[$var_allele_idx] = $tum_info{AD};
         }
+        # Handle VCF lines from mpileup/bcftools where DV contains the ALT allele depth
+        elsif( defined $tum_info{DV} and defined $tum_info{DP} ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @tum_depths = map{""} @alleles;
+            $tum_depths[$var_allele_idx] = $tum_info{DV};
+        }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @tum_depths and $#tum_depths != $#alleles ) {
             warn "WARNING: Unusual AD format for alleles $ref,$alt in $format_line = " . $rest[$vcf_tumor_idx] . "\n";
@@ -487,6 +493,12 @@ while( my $line = $vcf_fh->getline ) {
             # Reference allele depth and depths for any other ALT alleles must be left undefined
             @nrm_depths = map{""} @alleles;
             $nrm_depths[$var_allele_idx] = $nrm_info{AD};
+        }
+        # Handle VCF lines from mpileup/bcftools where DV contains the ALT allele depth
+        elsif( defined $nrm_info{DV} and defined $nrm_info{DP} ) {
+            # Reference allele depth and depths for any other ALT alleles must be left undefined
+            @nrm_depths = map{""} @alleles;
+            $nrm_depths[$var_allele_idx] = $nrm_info{DV};
         }
         # For all other lines where #depths is not equal to #alleles, blank out the depths
         elsif( @nrm_depths and $#nrm_depths != $#alleles ) {
