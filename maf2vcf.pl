@@ -117,6 +117,7 @@ while( my $line = $maf_fh->getline ) {
         --$pos if( $ref_len > $al1_len or $ref_len > $al2_len );
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
+        $prefix_bp = uc( $prefix_bp );
         unless( $prefix_bp =~ m/^[ACGTN]$/ ) {
             warn "WARNING: Skipping variant at $chr:$pos. Failed to fetch bps from reference FASTA!\n";
             next;
