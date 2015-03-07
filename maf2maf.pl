@@ -10,12 +10,14 @@ use Pod::Usage qw( pod2usage );
 use File::Temp qw( tempdir );
 use File::Copy qw( move );
 use File::Path qw( mkpath rmtree );
+use Config;
 
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "~/vep", "~/.vep", 4,
-    "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4,
+    "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
 my $retain_cols = "Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase" .
@@ -82,7 +84,7 @@ else {
 }
 
 # Contruct a maf2vcf command and run it
-my $maf2vcf_cmd = "perl $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir " .
+my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir " .
     "--ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
     "--tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col ".
     "--nrm-vad-col $nrm_vad_col";
@@ -94,7 +96,7 @@ foreach my $tn_vcf ( @vcfs ) {
     my ( $tumor_id, $normal_id ) = $tn_vcf=~m/^.*\/(.*)_vs_(.*)\.vcf/;
     my $tn_maf = $tn_vcf;
     $tn_maf =~ s/.vcf$/.vep.maf/;
-    my $vcf2maf_cmd = "perl $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf " .
+    my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf " .
         "--tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data " .
         "--vep-forks $vep_forks --ref-fasta $ref_fasta";
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf!\nCommand: $vcf2maf_cmd\n";
@@ -233,7 +235,7 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 

@@ -62,18 +62,18 @@ Create temporary shell variables pointing to where we'll store VEP and its cache
     export VEP_PATH=~/vep
     export VEP_DATA=~/.vep
 
-Download the v77 release of VEP:
+Download the v78 release of VEP:
 
     mkdir $VEP_PATH; cd $VEP_PATH
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/77.tar.gz
-    tar -zxf 77.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/78.tar.gz
+    tar -zxf 78.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
 
 Download and unpack VEP's offline cache for GRCh37 and GRCh38:
 
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-77/variation/VEP/homo_sapiens_vep_77_GRCh{37,38}.tar.gz $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-78/variation/VEP/homo_sapiens_vep_78_GRCh{37,38}.tar.gz $VEP_DATA
     cat $VEP_DATA/*.tar.gz | tar -izxf - -C $VEP_DATA
 
-Install the Ensembl v77 API and download the reference FASTAs for GRCh37 and GRCh38:
+Install the Ensembl v78 API and download the reference FASTAs for GRCh37 and GRCh38:
 
     cd $VEP_PATH
     perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh37 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
@@ -81,28 +81,33 @@ Install the Ensembl v77 API and download the reference FASTAs for GRCh37 and GRC
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
-    perl convert_cache.pl --species homo_sapiens --version 77_GRCh37 --dir $VEP_DATA
-    perl convert_cache.pl --species homo_sapiens --version 77_GRCh38 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens --version 78_GRCh37 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens --version 78_GRCh38 --dir $VEP_DATA
 
 Test running VEP in offline mode, on the provided sample GRCh37 and GRCh38 VCFs:
 
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/77_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/77_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
+    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/78_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
 
 Install snpEff
 --------------
 
 snpEff ([snpeff.sourceforge.net](http://snpeff.sourceforge.net/)) is popular because of its portability and speed at mapping effects on all possible transcripts in a database like [Ensembl](http://useast.ensembl.org/Homo_sapiens/Info/Annotation) or [Refseq](http://www.ncbi.nlm.nih.gov/refseq/). It's download-able as a java archive, so make sure you have [Java installed](https://www.java.com/en/download/help/download_options.xml).
 
+Create temporary shell variables pointing to where we'll store snpEff and its cache data (non default paths can be used, but specify `--snpeff-path` and `--snpeff-data` when running vcf2maf):
+
+    export SNPEFF_PATH=~/snpEff
+    export SNPEFF_DATA=~/snpEff/data
+
 Download the latest release of snpEff into your home directory:
 
-    cd ~/
+    mkdir $SNPEFF_PATH; cd $SNPEFF_PATH/..
     curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
 
 Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v78 (Gencode v21) for GRCh38 (writes to `snpEff/data` by default):
 
-    cd ~/snpEff
+    cd $SNPEFF_PATH
     java -Xmx2g -jar snpEff.jar download GRCh37.75
     java -Xmx2g -jar snpEff.jar download GRCh38.78
 

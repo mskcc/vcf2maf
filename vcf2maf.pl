@@ -7,12 +7,14 @@ use warnings;
 use IO::File;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
+use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "~/vep", "~/.vep", 4, "~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
-my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "~/snpEff", "~/snpEff/data", "GRCh37.75" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "$ENV{HOME}/snpEff", "$ENV{HOME}/snpEff/data", "GRCh37.75" );
 my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
+my $perl_bin = $Config{perlpath};
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
@@ -243,7 +245,8 @@ elsif( $input_vcf ) {
             ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
             # Contruct VEP command using some default options and run it
-            my $vep_cmd = "perl $vep_path/variant_effect_predictor.pl --quiet --fork $vep_forks --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --quiet --offline --no_stats --everything --check_existing --total_length --allele_number --no_escape --gencode_basic --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
+            $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
 
             system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
             ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
@@ -830,7 +833,7 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/76_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
  --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]
  --snpeff-db      Database version to use when running snpEff [GRCh37.75]
