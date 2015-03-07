@@ -11,7 +11,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 1, "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
 my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "$ENV{HOME}/snpEff", "$ENV{HOME}/snpEff/data", "GRCh37.75" );
 my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
