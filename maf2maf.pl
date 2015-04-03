@@ -249,6 +249,6 @@ This script runs a given MAF through maf2vcf to generate per-TN-pair VCFs in a t
 
 =head1 LICENSE
 
- LGPL v3 | GNU Lesser General Public License v3.0 | http://www.gnu.org/licenses/lgpl-3.0.html
+ Apache-2.0 | Apache License, Version 2.0 | https://www.apache.org/licenses/LICENSE-2.0
 
 =cut

@@ -124,4 +124,4 @@ Authors
 License
 -------
 
-    LGPL v3 | GNU Lesser General Public License v3.0 | http://gnu.org/licenses/lgpl-3.0.html
+    Apache-2.0 | Apache License, Version 2.0 | https://www.apache.org/licenses/LICENSE-2.0
