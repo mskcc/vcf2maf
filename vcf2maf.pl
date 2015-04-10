@@ -48,6 +48,7 @@ sub GetEffectPriority {
         'synonymous_variant' => 8, # A sequence variant where there is no resulting change to the encoded amino acid
         'splice_region_variant' => 9, # A sequence variant in which a change has occurred within the region of the splice site, either within 1-3 bases of the exon or 3-8 bases of the intron
         'incomplete_terminal_codon_variant' => 10, # A sequence variant where at least one base of the final codon of an incompletely annotated transcript is changed
+        'protein_altering_variant' => 11, # A sequence variant which is predicted to change the protein encoded in the coding sequence
         'coding_sequence_variant' => 11, # A sequence variant that changes the coding sequence
         'mature_miRNA_variant' => 11, # A transcript variant located with the sequence of the mature miRNA
         'exon_variant' => 11, # A sequence variant that changes exon sequence
@@ -114,6 +115,12 @@ sub GetBiotypePriority {
         'disrupted_domain' => 6, # Otherwise viable coding region omitted from this alternatively spliced transcript because the splice variation affects a region coding for a protein domain
         'processed_transcript' => 6, # Doesn't contain an ORF
         'TEC' => 6, # To be Experimentally Confirmed. This is used for non-spliced EST clusters that have polyA features. This category has been specifically created for the ENCODE project to highlight regions that could indicate the presence of protein coding genes that require experimental validation, either by 5' RACE or RT-PCR to extend the transcripts, or by confirming expression of the putatively-encoded peptide with specific antibodies
+        'TF_binding_site' => 7, # A region of a nucleotide molecule that binds a Transcription Factor or Transcription Factor complex
+        'CTCF_binding_site' =>7, # A transcription factor binding site with consensus sequence CCGCGNGGNGGCAG, bound by CCCTF-binding factor
+        'promoter_flanking_region' => 7, # A region immediately adjacent to a promoter which may or may not contain transcription factor binding sites
+        'enhancer' => 7, # A cis-acting sequence that increases the utilization of (some) eukaryotic promoters, and can function in either orientation and in any location (upstream or downstream) relative to the promoter
+        'promoter' => 7, # A regulatory_region composed of the TSS(s) and binding sites for TF_complexes of the basal transcription machinery
+        'open_chromatin_region' => 7, # A DNA sequence that in the normal state of the chromosome corresponds to an unfolded, un-complexed stretch of double-stranded DNA
         'retained_intron' => 7, # Alternatively spliced transcript believed to contain intronic sequence relative to other, coding, variants
         'nonsense_mediated_decay' => 7, # If the coding sequence (following the appropriate reference) of a transcript finishes >50bp from a downstream splice site then it is tagged as NMD. If the variant does not cover the full reference coding sequence then it is annotated as NMD if NMD is unavoidable i.e. no matter what the exon structure of the missing portion is the transcript will be subject to NMD
         'non_stop_decay' => 7, # Transcripts that have polyA features (including signal) without a prior stop codon in the CDS, i.e. a non-genomic polyA tail attached directly to the CDS without 3' UTR. These transcripts are subject to degradation
