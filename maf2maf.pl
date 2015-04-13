@@ -138,8 +138,12 @@ if( $retain_cols ) {
             }
         }
         else {
-            # Create a key for this variant using Chromosome:Start_Position:Tumor_Sample_Barcode
-            my $key = join( ":", map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode ));
+            # Figure out which of the tumor alleles is non-reference
+            my ( $ref, $al1, $al2 ) = map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 );
+            my $var_allele = ( defined $al1 and $al1 ne $ref ? $al1 : $al2 );
+
+            # Create a key for this variant using Chromosome:Start_Position:Tumor_Sample_Barcode:Reference_Allele:Variant_Allele
+            my $key = join( ":", ( map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele )), $var_allele );
 
             # Store values for this variant into a hash, adding column names to the key
             foreach my $c ( map{lc} split( ",", $retain_cols )) {
@@ -179,7 +183,7 @@ if( $retain_cols ) {
             }
             # For all other lines, insert the data collected from the original input MAF
             else {
-                my $key = join( ":", map{ my $c = lc; $cols[$output_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode ));
+                my $key = join( ":", map{ my $c = lc; $cols[$output_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele Tumor_Seq_Allele2 ));
                 foreach my $c ( map{lc} split( /\t/, $maf_header )){
                     if( !$force_new_cols{$c} and defined $input_maf_data{$key}{$c} ) {
                         $cols[$output_maf_col_idx{$c}] = $input_maf_data{$key}{$c};
