@@ -139,8 +139,8 @@ if( $retain_cols ) {
         }
         else {
             # Figure out which of the tumor alleles is non-reference
-            my ( $ref, $al1, $al2 ) = map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 );
-            my $var_allele = ( defined $al1 and $al1 ne $ref ? $al1 : $al2 );
+            my ( $ref, $al1, $al2 ) = map{ my $c = lc; ( defined $input_maf_col_idx{$c} ? $cols[$input_maf_col_idx{$c}] : "" ) } qw( Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 );
+            my $var_allele = (( defined $al1 and $al1 and $al1 ne $ref ) ? $al1 : $al2 );
 
             # Create a key for this variant using Chromosome:Start_Position:Tumor_Sample_Barcode:Reference_Allele:Variant_Allele
             my $key = join( ":", ( map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele )), $var_allele );
