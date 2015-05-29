@@ -18,7 +18,7 @@ The subsequent 10 columns are relevant to most analyses.
 The next column is relevant to analyses that consider the effect of the variant on all alternate
 isoforms of the gene, or on non-coding/regulatory transcripts. The effects are sorted first by
 transcript biotype priority, then by effect severity, and finally by decreasing order of transcript
-length. Each effect in the list is in the format [Gene_Name,Effect,HGVSp,Transcript_ID].
+length. Each effect in the list is in the format [Gene_Name,Effect,HGVSp,Transcript_ID,].
 
 46. all_effects - a semicolon delimited list of all possible variant effects, sorted by priority
 

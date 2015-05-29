@@ -162,7 +162,7 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help, $use_snpeff ) = ( 0, 0, 0 );
-my ( $input_vcf, $vep_anno, $snpeff_anno, $output_maf );
+my ( $input_vcf, $vep_anno, $snpeff_anno, $output_maf, $custom_enst_file );
 my ( $vcf_tumor_id, $vcf_normal_id );
 GetOptions(
     'help!' => \$help,
@@ -176,6 +176,7 @@ GetOptions(
     'normal-id=s' => \$normal_id,
     'vcf-tumor-id=s' => \$vcf_tumor_id,
     'vcf-normal-id=s' => \$vcf_normal_id,
+    'custom-enst=s' => \$custom_enst_file,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
@@ -201,6 +202,13 @@ elsif( $use_snpeff and ( $vep_anno or $snpeff_anno )) {
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
 $vcf_normal_id = $normal_id unless( $vcf_normal_id );
+
+# Load up the custom isoform overrides if provided:
+my %custom_enst;
+if( $custom_enst_file ) {
+	( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty!\nPath: $custom_enst_file\n";
+    %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
+}
 
 # Annotate variants in given VCF to all possible transcripts, unless an annotated VCF was provided
 if( $vep_anno ) {
@@ -644,8 +652,11 @@ while( my $line = $vcf_fh->getline ) {
         my ( $effect_with_gene_name ) = grep { $_->{SYMBOL} } @all_effects;
         my $maf_gene = $effect_with_gene_name->{SYMBOL} if( $effect_with_gene_name );
 
+        # If the gene has user-defined custom isoform overrides, choose that instead
+        ( $maf_effect ) = grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{Transcript_ID} and $custom_enst{$_->{Transcript_ID}} } @all_effects;
+
         # Find the effect on the canonical transcript of that highest priority gene
-        ( $maf_effect ) = grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects;
+        ( $maf_effect ) = grep { $_->{SYMBOL} and $_->{SYMBOL} eq $maf_gene and $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects unless( $maf_effect );
 
         # If that gene has no canonical transcript tagged, choose the highest priority canonical effect on any gene
         ( $maf_effect ) = grep { $_->{CANONICAL} and $_->{CANONICAL} eq "YES" } @all_effects unless( $maf_effect );
@@ -725,8 +736,11 @@ while( my $line = $vcf_fh->getline ) {
         my ( $effect_with_gene_name ) = grep { $_->{Gene_Name} } @all_effects;
         my $maf_gene = $effect_with_gene_name->{Gene_Name} if( $effect_with_gene_name );
 
+        # If the gene has user-defined custom isoform overrides, choose that instead
+        ( $maf_effect ) = grep { $_->{Gene_Name} and $_->{Gene_Name} eq $maf_gene and $_->{Transcript_ID} and $custom_enst{$_->{Transcript_ID}} } @all_effects;
+
         # Find the effect on the longest transcript of that highest priority gene
-        ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects;
+        ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects unless( $maf_effect );
     }
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
@@ -779,7 +793,8 @@ while( my $line = $vcf_fh->getline ) {
         my $effect_type = ( $effect->{Effect} ? $effect->{Effect} : $effect->{Consequence} );
         my $protein_change = ( $effect->{HGVSp} ? $effect->{HGVSp} : '' );
         my $transcript_id = ( $effect->{Transcript_ID} ? $effect->{Transcript_ID} : '' );
-        $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id;" if( $gene_name and $effect_type and $transcript_id );
+        my $refseq_ids = ( $effect->{RefSeq} ? $effect->{RefSeq} : '' );
+        $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $gene_name and $effect_type and $transcript_id );
     }
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
@@ -836,6 +851,7 @@ __DATA__
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
  --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
+ --custom-enst    List of custom ENST IDs that override canonical selection
  --use-snpeff     Use snpEff to annotate VCF, instead of the default VEP
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]

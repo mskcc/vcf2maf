@@ -45,7 +45,7 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 
 # Parse options and print usage syntax on a syntax error, or if help was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
-my ( $input_maf, $output_maf, $tmp_dir );
+my ( $input_maf, $output_maf, $tmp_dir, $custom_enst_file );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -59,6 +59,7 @@ GetOptions(
     'nrm-rad-col=s' => \$nrm_rad_col,
     'nrm-vad-col=s' => \$nrm_vad_col,
     'retain-cols=s' => \$retain_cols,
+    'custom-enst=s' => \$custom_enst_file,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
@@ -99,6 +100,7 @@ foreach my $tn_vcf ( @vcfs ) {
     my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf " .
         "--tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data " .
         "--vep-forks $vep_forks --ref-fasta $ref_fasta";
+    $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf!\nCommand: $vcf2maf_cmd\n";
 }
 
@@ -236,6 +238,7 @@ __DATA__
  --nrm-rad-col    Name of MAF column for reference allele depth in normal BAM [n_ref_count]
  --nrm-vad-col    Name of MAF column for variant allele depth in normal BAM [n_alt_count]
  --retain-cols    Comma-delimited list of columns to retain from the input MAF [Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase,Sequence_Source,Validation_Method,Score,BAM_file,Sequencer,Tumor_Sample_UUID,Matched_Norm_Sample_UUID]
+ --custom-enst    List of custom ENST IDs that override canonical selection
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
