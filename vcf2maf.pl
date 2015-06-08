@@ -534,7 +534,7 @@ while( my $line = $vcf_fh->getline ) {
         }
 
         # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
-        if(( $nrm_depths[0] and $nrm_depths[$var_allele_idx] ) and ( !defined $nrm_info{DP} or $nrm_info{DP} eq '.' )) {
+        if(( defined $nrm_depths[0] and defined $nrm_depths[$var_allele_idx] ) and ( !defined $nrm_info{DP} or $nrm_info{DP} eq '.' )) {
             warn "WARNING: DP undefined but ADs available. Setting DP to sum of allele depths in $format_line = " . $rest[$vcf_normal_idx] . "\n";
             $nrm_info{DP} = 0;
             map{$nrm_info{DP} += $_ if($_ and $_ ne '.')} @nrm_depths;
