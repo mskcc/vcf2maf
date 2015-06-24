@@ -260,7 +260,7 @@ elsif( $input_vcf ) {
             ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
             # Contruct VEP command using some default options and run it
-            my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --quiet --offline --no_stats --everything --shift_hgvs --check_existing --total_length --allele_number --no_escape --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
+            my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --quiet --offline --no_stats --everything --shift_hgvs --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
             $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
 
             system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
