@@ -116,15 +116,12 @@ while( my $line = $maf_fh->getline ) {
 
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
-    if( $ref_len != $al1_len or $ref_len != $al2_len ) {
-        --$pos if( $ref_len > $al1_len or $ref_len > $al2_len );
+    if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
+        --$pos if( $ref_len > $al1_len or $ref_len > $al2_len ); # Decrement POS for deletions only
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
         $prefix_bp = uc( $prefix_bp );
-        unless( $prefix_bp =~ m/^[ACGTN]$/ ) {
-            warn "WARNING: Skipping variant at $chr:$pos. Failed to fetch bps from reference FASTA!\n";
-            next;
-        }
+        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please specify --ref-fasta appropriately\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
         ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
@@ -146,8 +143,8 @@ while( my $line = $maf_fh->getline ) {
     }
 
     # Set tumor and normal genotypes (FORMAT tag GT in VCF)
-    my $t_gt = join( "/", $al_idx{$al1}, $al_idx{$al2} );
-    my $n_gt = join( "/", $al_idx{$n_al1}, $al_idx{$n_al2} );
+    my $t_gt = join( "/", $al_idx{$al2}, $al_idx{$al1} );
+    my $n_gt = join( "/", $al_idx{$n_al2}, $al_idx{$n_al1} );
 
     # Create the VCF's comma-delimited ALT field that must list all non-REF (variant) alleles
     my $alt = join( ",", @alleles[1..$#alleles] );
