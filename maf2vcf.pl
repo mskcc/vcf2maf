@@ -50,6 +50,7 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
 my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
+my %vcf_fh = ();
 while( my $line = $maf_fh->getline ) {
 
     # Skip comment lines
@@ -78,13 +79,12 @@ while( my $line = $maf_fh->getline ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
             $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
             my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-            my $vcf_fh = IO::File->new( $vcf_file, ">" );
-            $vcf_fh->print( "##fileformat=VCFv4.2\n" );
-            $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
-            $vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
-            $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
-            $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
-            $vcf_fh->close;
+            $vcf_fh{ $vcf_file } = IO::File->new( $vcf_file, ">" );
+            $vcf_fh{ $vcf_file }->print( "##fileformat=VCFv4.2\n" );
+            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
+            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
+            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
+            $vcf_fh{ $vcf_file }->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
         }
         next;
     }
@@ -162,11 +162,11 @@ while( my $line = $maf_fh->getline ) {
     # Contruct a VCF formatted line and append it to the respective VCF
     my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
     my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
-    my $vcf_fh = IO::File->new( $vcf_file, ">>" );
-    $vcf_fh->print( "$vcf_line\n" );
-    $vcf_fh->close;
+    $vcf_fh{ $vcf_file }->print( "$vcf_line\n" );
 }
 $maf_fh->close;
+
+foreach (keys %vcf_fh) { $vcf_fh{ $_ }->close };
 
 # Make sure that we handled a positive non-zero number of lines in the MAF
 ( $line_count > 0 ) or die "ERROR: No variant lines in the input MAF!\n";
