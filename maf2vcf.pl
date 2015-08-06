@@ -51,6 +51,11 @@ my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $inp
 my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
 my %vcf_fh = ();
+my @col_pair;
+my %col_pair_idx;
+my @var_pos;
+my %var_fmt;
+
 while( my $line = $maf_fh->getline ) {
 
     # Skip comment lines
@@ -75,6 +80,8 @@ while( my $line = $maf_fh->getline ) {
 
         # For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
+        $idx = 1;
+        my %n_samples;
         foreach my $pair ( @tn_pair ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
             $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
@@ -85,6 +92,11 @@ while( my $line = $maf_fh->getline ) {
             $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
             $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
             $vcf_fh{ $vcf_file }->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
+            # Make sure each (normal) sample has a unique column name in a multi-sample VCF
+            $col_pair_idx { "$t_id\t$n_id" } = scalar @col_pair;
+            ( ! exists $n_samples{ $n_id } ) or $n_id .= $idx++;
+            $n_samples{ $n_id } = 1;
+            push( @col_pair, "$t_id\t$n_id" );
         }
         next;
     }
@@ -95,6 +107,7 @@ while( my $line = $maf_fh->getline ) {
 
     # For a variant in the MAF, parse out the bare minimum data needed by a VCF
     my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : undef )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+    next unless ( $t_id );
 
     # Parse out read counts for ref/var alleles, if available
     my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{my $c = lc; (( defined $col_idx{$c} and defined $cols[$col_idx{$c}] and $cols[$col_idx{$c}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$c}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
@@ -163,10 +176,40 @@ while( my $line = $maf_fh->getline ) {
     my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
     my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
     $vcf_fh{ $vcf_file }->print( "$vcf_line\n" );
+    
+    # Store VCF formatted data for the multi-sample VCF
+    my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
+    ( exists $var_fmt{ $key } ) or push( @var_pos, $key );
+    $var_fmt{ $key }{ $col_pair_idx{ "$t_id\t$n_id"} } = "$t_fmt\t$n_fmt";
 }
 $maf_fh->close;
 
 foreach (keys %vcf_fh) { $vcf_fh{ $_ }->close };
+
+
+# Initialize header lines of the multi-sample VCF
+my $vcf_file = "$output_dir/" . substr( $input_maf, rindex($input_maf, '/')+1 );
+$vcf_file .= '.vcf' if( $vcf_file !~ /\.vcf/ );
+my $vcf_fh = IO::File->new( $vcf_file, ">" );
+$vcf_fh->print( "##fileformat=VCFv4.2\n" );
+$vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
+$vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
+$vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
+$vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @col_pair) . "\n" );
+# Write data to VCF
+foreach my $var ( @var_pos ) {
+    $vcf_fh->print( join( "\t", $var, qw( . . . ), "GT:AD:DP" ) );
+    for( my $i = 0; $i < scalar @col_pair; $i++ ){
+        if ( exists $var_fmt{ $var }{ $i } ){
+            $vcf_fh->print( "\t" . $var_fmt{ $var }{ $i } );
+        }else{
+            $vcf_fh->print( "\t" . "./.\t./." );
+        }
+    }
+    $vcf_fh->print( "\n" );
+}
+$vcf_fh->close;
+
 
 # Make sure that we handled a positive non-zero number of lines in the MAF
 ( $line_count > 0 ) or die "ERROR: No variant lines in the input MAF!\n";
