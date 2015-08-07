@@ -51,8 +51,8 @@ my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $inp
 my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
 my %vcf_fh = ();
-my @col_pair;
-my %col_pair_idx;
+my %vcf_col_pair;
+my %vcf_col_idx;
 my @var_pos;
 my %var_fmt;
 
@@ -80,8 +80,7 @@ while( my $line = $maf_fh->getline ) {
 
         # For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
-        $idx = 1;
-        my %n_samples;
+        $idx = 0;
         foreach my $pair ( @tn_pair ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
             $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
@@ -92,11 +91,11 @@ while( my $line = $maf_fh->getline ) {
             $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
             $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
             $vcf_fh{ $vcf_file }->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
-            # Make sure each (normal) sample has a unique column name in a multi-sample VCF
-            $col_pair_idx { "$t_id\t$n_id" } = scalar @col_pair;
-            ( ! exists $n_samples{ $n_id } ) or $n_id .= $idx++;
-            $n_samples{ $n_id } = 1;
-            push( @col_pair, "$t_id\t$n_id" );
+            
+            # Keep sample information for multi-sample VCF
+            $vcf_col_idx{ $t_id } = $idx++;
+            $vcf_col_idx{ $n_id } = $idx++ if ( !exists $vcf_col_idx{ $n_id } );
+            $vcf_col_pair{ $t_id } = $n_id;
         }
         next;
     }
@@ -180,35 +179,39 @@ while( my $line = $maf_fh->getline ) {
     # Store VCF formatted data for the multi-sample VCF
     my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
     ( exists $var_fmt{ $key } ) or push( @var_pos, $key );
-    $var_fmt{ $key }{ $col_pair_idx{ "$t_id\t$n_id"} } = "$t_fmt\t$n_fmt";
+    $var_fmt{ $key }{ $vcf_col_idx{ $t_id } } = $t_fmt;
+    $var_fmt{ $key }{ $vcf_col_idx{ $n_id } } = $n_fmt;
 }
 $maf_fh->close;
 
 foreach (keys %vcf_fh) { $vcf_fh{ $_ }->close };
 
-
 # Initialize header lines of the multi-sample VCF
 my $vcf_file = "$output_dir/" . substr( $input_maf, rindex($input_maf, '/')+1 );
-$vcf_file .= '.vcf' if( $vcf_file !~ /\.vcf/ );
+$vcf_file =~ s/\.(txt|maf)*$/.vcf/;
+( $vcf_file =~ m/\.vcf$/ ) or $vcf_file .= '.vcf';
+my @vcf_cols = sort { $vcf_col_idx{$a} <=> $vcf_col_idx{$b} } keys %vcf_col_idx;
 my $vcf_fh = IO::File->new( $vcf_file, ">" );
 $vcf_fh->print( "##fileformat=VCFv4.2\n" );
 $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
 $vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
 $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
-$vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @col_pair) . "\n" );
-# Write data to VCF
+$vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @vcf_cols) . "\n" );
+# Write data to multi-sample VCF
 foreach my $var ( @var_pos ) {
     $vcf_fh->print( join( "\t", $var, qw( . . . ), "GT:AD:DP" ) );
-    for( my $i = 0; $i < scalar @col_pair; $i++ ){
-        if ( exists $var_fmt{ $var }{ $i } ){
-            $vcf_fh->print( "\t" . $var_fmt{ $var }{ $i } );
-        }else{
-            $vcf_fh->print( "\t" . "./.\t./." );
-        }
-    }
+    map{ $vcf_fh->print( "\t" . ( ( exists $var_fmt{$var}{$_} ) ? $var_fmt{$var}{$_} : './.' )) }(0..$#vcf_cols);
     $vcf_fh->print( "\n" );
 }
 $vcf_fh->close;
+
+# Create a T-N pairing TSV file
+my $tsv_file = $vcf_file;
+$tsv_file =~ s/\.vcf$/.tsv/;
+my $tsv_fh = IO::File->new( $tsv_file, ">" )  or die "ERROR: Fail to create file $tsv_file\n";
+$tsv_fh->print( "#Tumor_Sample_Barcode\tMatched_Norm_Sample_Barcode\n" );
+map{ $tsv_fh->print( "$_\t$vcf_col_pair{$_}\n" ) if( exists $vcf_col_pair{$_} ) }@vcf_cols;
+$tsv_fh->close;
 
 
 # Make sure that we handled a positive non-zero number of lines in the MAF
