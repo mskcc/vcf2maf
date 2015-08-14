@@ -3,33 +3,21 @@ vcf2maf
 
 [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.14107.svg)](http://dx.doi.org/10.5281/zenodo.14107)
 
-To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean towards best practices. Per the current defaults, a single affected transcript is selected per variant, as follows:
- 1. Sort effects first by transcript [biotype priority](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L86), then by [effect severity](https://github.com/ckandoth/vcf2maf/blob/master/vcf2maf.pl#L26), and finally by decreasing transcript length
- 2. Pick the gene on the top of the list (worst-affected), and choose it's [canonical](http://www.ensembl.org/Help/Glossary?id=346) transcript (VEP picks the longest [CCDS](http://www.ncbi.nlm.nih.gov/CCDS/) isoform)
- 3. If the gene has no canonical transcript tagged (if you used snpEff), choose its longest transcript instead
+To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean towards best practices.
 
 Quick start
 -----------
 
-Download the latest release of vcf2maf, and view the detailed usage manual:
+Download the latest stable branch of vcf2maf, and view the detailed usage manual:
 
-    curl -LO https://github.com/ckandoth/vcf2maf/archive/master.zip; unzip master.zip; cd vcf2maf-master
+    curl -LO https://github.com/mskcc/vcf2maf/archive/master.zip; unzip master.zip; cd vcf2maf-master
     perl vcf2maf.pl --man
 
-To download properly versioned releases, [click here](https://github.com/ckandoth/vcf2maf/releases) for a list.
+To download properly versioned releases, [click here](https://github.com/mskcc/vcf2maf/releases) for a list.
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) or [snpEff](http://snpeff.sourceforge.net/) installed, see the sections below. VEP is preferred for it's CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html), and is used by default. So after installing VEP, you can test the script like so:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, see the sections below. VEP is preferred for it's CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html), and is used by default. So after installing VEP, you can test the script like so:
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf
-
-If you'd rather use snpEff, there's an option for that:
-
-    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.snpeff.maf --use-snpeff
-
-If you already have a VCF annotated with either VEP or snpEff, you can use those directly. You should have ran VEP with at least these options: `--everything --check_existing --total_length --allele_number --xref_refseq`. And for snpEff use these options: `-hgvs -sequenceOntology`. In older versions of snpEff, `-sequenceOntology` was incorrectly spelled `-sequenceOntolgy`. Feed your VEP/snpEff annotated VCFs into vcf2maf as follows:
-
-    perl vcf2maf.pl --input-vep data/test.vep.vcf --output-maf data/test.maf
-    perl vcf2maf.pl --input-snpeff data/test.snpeff.vcf --output-maf data/test.maf
 
 To fill columns 16 and 17 of the output MAF with tumor/normal sample IDs, and to parse out genotypes and allele counts from matched genotype columns in the VCF, use options `--tumor-id` and `--normal-id`. Skip option `--normal-id` if you didn't have a matched normal:
 
@@ -39,15 +27,18 @@ VCFs from variant callers like [VarScan](http://varscan.sourceforge.net/somatic-
 
     perl vcf2maf.pl --input-vcf data/test_varscan.vcf --output-maf data/test_varscan.maf --tumor-id WD1309 --normal-id NB1308 --vcf-tumor-id TUMOR --vcf-normal-id NORMAL
 
-If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, there are options available to point the script there. Similar options available for snpEff too:
+If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`, there are options available to point the script there:
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --vep-path /opt/vep --vep-data /srv/vep
-    perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --snpeff-path /opt/snpEff --snpeff-data /opt/snpEff/data --use-snpeff
+
+If you have a MAF file that you simply want to reannotate, then use `maf2maf`, which simply runs `maf2vcf` followed by `vcf2maf`:
+
+    perl maf2maf.pl --input-maf data/test.maf --output-maf data/test.vep.maf
 
 Install VEP
 -----------
 
-Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/tools/vep/index.html)) is popular for how it selects a single "canonical transcript" per gene as [detailed here](http://useast.ensembl.org/Help/Glossary?id=346), its CLIA-compliant [HGVS variant format](http://www.hgvs.org/mutnomen/recs.html), and [Sequence Ontology nomenclature](http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences) for variant effects.
+Ensembl's VEP ([Variant Effect Predictor](http://useast.ensembl.org/info/docs/tools/vep/index.html)) is popular for how it picks a single effect per gene as [detailed here](http://www.ensembl.org/info/docs/tools/vep/script/vep_other.html#pick), its CLIA-compliant [HGVS variant format](http://www.hgvs.org/mutnomen/recs.html), and [Sequence Ontology nomenclature](http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences) for variant effects.
 
 To follow these instructions, we'll assume you have these packaged essentials installed:
 
@@ -93,37 +84,6 @@ Convert the offline cache for use with tabix, that significantly speeds up the l
 Test running VEP in offline mode, on the provided sample GRCh38 VCF:
 
     perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh38 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/81_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
-
-Install snpEff
---------------
-
-snpEff ([snpeff.sourceforge.net](http://snpeff.sourceforge.net/)) is popular because of its portability and speed at mapping effects on all possible transcripts in a database like [Ensembl](http://useast.ensembl.org/Homo_sapiens/Info/Annotation) or [Refseq](http://www.ncbi.nlm.nih.gov/refseq/). It's download-able as a java archive, so make sure you have [Java installed](https://www.java.com/en/download/help/download_options.xml).
-
-To follow these instructions, we'll assume you have these bare essentials installed:
-
-    curl unzip java
-
-Create temporary shell variables pointing to where we'll store snpEff and its cache data (non default paths can be used, but specify `--snpeff-path` and `--snpeff-data` when running vcf2maf):
-
-    export SNPEFF_PATH=~/snpEff
-    export SNPEFF_DATA=~/snpEff/data
-
-Download the latest release of snpEff into your home directory:
-
-    mkdir $SNPEFF_PATH; cd $SNPEFF_PATH/..
-    curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
-    unzip snpEff_latest_core.zip
-
-Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v81 (Gencode v21) for GRCh38 (writes to `snpEff/data` by default):
-
-    cd $SNPEFF_PATH
-    java -Xmx2g -jar snpEff.jar download -dataDir $SNPEFF_DATA GRCh37.75
-    java -Xmx2g -jar snpEff.jar download -dataDir $SNPEFF_DATA GRCh38.81
-
-Test running snpEff on any available GRCh37 and GRCh38 VCFs:
-
-    java -Xmx4g -jar snpEff.jar eff -dataDir $SNPEFF_DATA GRCh37.75 ~/vep/example_GRCh37.vcf > example_GRCh37.snpeff.vcf
-    java -Xmx4g -jar snpEff.jar eff -dataDir $SNPEFF_DATA GRCh38.81 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
 
 Authors
 -------
