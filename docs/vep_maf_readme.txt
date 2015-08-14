@@ -55,17 +55,25 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 74. EXON - the exon number (out of total number)
 75. INTRON - the intron number (out of total number)
 76. DOMAINS - the source and identifer of any overlapping protein domains
-77. GMAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1
-78. AFR_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined African population
-79. AMR_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined American population
-80. ASN_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined Asian population
-81. EUR_MAF - minor allele and frequency of existing variation in 1000 Genomes Phase 1 combined European population
-82. AA_MAF - minor allele and frequency of existing variant in NHLBI-ESP African American population
-83. EA_MAF - minor allele and frequency of existing variant in NHLBI-ESP European American population
-84. CLIN_SIG - clinical significance of variant from dbSNP
-85. SOMATIC - somatic status of existing variation(s)
-86. PUBMED - pubmed ID(s) of publications that cite existing variant
-87. MOTIF_NAME - the source and identifier of a transcription factor binding profile aligned at this position
-88. MOTIF_POS - the relative position of the variation in the aligned TFBP
-89. HIGH_INF_POS - a flag indicating if the variant falls in a high information position of a transcription factor binding profile (TFBP)
-90. MOTIF_SCORE_CHANGE - the difference in motif score of the reference and variant sequences for the TFBP
+77. GMAF - Non-reference allele and frequency of existing variant in 1000 Genomes
+78. AFR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined African population
+79. AMR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined American population
+80. ASN_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined Asian population
+81. EAS_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined East Asian population
+82. EUR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined European population
+83. SAS_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined South Asian population
+84. AA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP African American population
+85. EA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP European American population
+86. CLIN_SIG - clinical significance of variant from dbSNP
+87. SOMATIC - somatic status of existing variation(s)
+88. PUBMED - pubmed ID(s) of publications that cite existing variant
+89. MOTIF_NAME - the source and identifier of a transcription factor binding profile aligned at this position
+90. MOTIF_POS - the relative position of the variation in the aligned TFBP
+91. HIGH_INF_POS - a flag indicating if the variant falls in a high information position of a transcription factor binding profile (TFBP)
+92. MOTIF_SCORE_CHANGE - the difference in motif score of the reference and variant sequences for the TFBP
+93. IMPACT - the impact modifier for the consequence type
+94. PICK - indicates if this block of consequence data was picked by VEP's pick feature
+95. VARIANT_CLASS - Sequence Ontology variant class
+96. TSL - Transcript support level
+97. HGVS_OFFSET - Indicates by how many bases the HGVS notations for this variant have been shifted
+98. PHENO - Indicates if existing variant is associated with a phenotype, disease or trait

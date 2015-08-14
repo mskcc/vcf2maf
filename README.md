@@ -31,7 +31,7 @@ If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`,
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --vep-path /opt/vep --vep-data /srv/vep
 
-If you have a MAF file that you simply want to reannotate, then use `maf2maf`, which simply runs `maf2vcf` followed by `vcf2maf`:
+If you have a MAF-like file that you want to reannotate, then use `maf2maf`, which simply runs `maf2vcf` followed by `vcf2maf`:
 
     perl maf2maf.pl --input-maf data/test.maf --output-maf data/test.vep.maf
 
