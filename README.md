@@ -57,43 +57,42 @@ To follow these instructions, we'll assume you have these packaged essentials in
 
 Handle VEP's Perl dependencies using cpanminus to install them under `~/perl5`:
 
-    curl -L http://cpanmin.us | perl - --notest Archive::Extract Archive::Tar Archive::Zip LWP::Simple CGI DBI Time::HiRes
+    curl -L http://cpanmin.us | perl - --notest -l ~/perl5 LWP::Simple LWP::Protocol::https Archive::Extract Archive::Tar Archive::Zip CGI DBI Time::HiRes
 
-Set PERL5LIB to find those libraries. Also add this command to the end of your `.bashrc` to make it persistent:
+Set PERL5LIB to find those libraries. Add this to the end of your `~/.bashrc` to make it persistent:
 
-    export PERL5LIB=~/perl5/lib/perl5:~/perl5/lib/perl5/site_perl
+    export PERL5LIB=~/perl5/lib/perl5:~/perl5/lib/perl5/x86_64-linux
 
 Create temporary shell variables pointing to where we'll store VEP and its cache data (non default paths can be used, but specify `--vep-path` and `--vep-data` when running vcf2maf):
 
     export VEP_PATH=~/vep
     export VEP_DATA=~/.vep
 
-Download the v79 release of VEP:
+Download the v81 release of VEP:
 
-    mkdir $VEP_PATH; cd $VEP_PATH
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/79.tar.gz
-    tar -zxf 79.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+    mkdir $VEP_PATH $VEP_DATA; cd $VEP_PATH
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/81.tar.gz
+    tar -zxf 81.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
 
-Download and unpack VEP's offline cache for GRCh37 and GRCh38:
+Download and unpack VEP's offline cache for GRCh37, GRCh38, and GRCm38:
 
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-79/variation/VEP/homo_sapiens_vep_79_GRCh{37,38}.tar.gz $VEP_DATA
-    cat $VEP_DATA/*.tar.gz | tar -izxf - -C $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-81/variation/VEP/homo_sapiens_vep_81_GRCh{37,38}.tar.gz $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-81/variation/VEP/mus_musculus_vep_81_GRCm38.tar.gz $VEP_DATA
+    cat $VEP_DATA/*_vep_81_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
 
-Install the Ensembl v79 API and download the reference FASTAs for GRCh37 and GRCh38:
+Install the Ensembl API and download the reference FASTAs for GRCh37, GRCh38, and GRCm38:
 
     cd $VEP_PATH
-    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh37 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
-    perl INSTALL.pl --AUTO af --SPECIES homo_sapiens --ASSEMBLY GRCh38 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens,mus_musculus --ASSEMBLY GRCh38,GRCm38 --PLUGINS CADD,ExAC,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh37 --PLUGINS CADD,ExAC,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
-    perl convert_cache.pl --species homo_sapiens --version 79_GRCh37 --dir $VEP_DATA
-    perl convert_cache.pl --species homo_sapiens --version 79_GRCh38 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens,mus_musculus --version 81_GRCh37,81_GRCh38,81_GRCm38 --dir $VEP_DATA
 
-Test running VEP in offline mode, on the provided sample GRCh37 and GRCh38 VCFs:
+Test running VEP in offline mode, on the provided sample GRCh38 VCF:
 
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/79_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --assembly GRCh37 --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
-    perl variant_effect_predictor.pl --offline --gencode_basic --everything --total_length --allele_number --no_escape --check_existing --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/79_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --assembly GRCh38 --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
+    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh38 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/81_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
 
 Install snpEff
 --------------
@@ -115,16 +114,16 @@ Download the latest release of snpEff into your home directory:
     curl -LO http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
     unzip snpEff_latest_core.zip
 
-Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v78 (Gencode v21) for GRCh38 (writes to `snpEff/data` by default):
+Import the Ensembl v75 (Gencode v19) database for GRCh37, and Ensembl v81 (Gencode v21) for GRCh38 (writes to `snpEff/data` by default):
 
     cd $SNPEFF_PATH
     java -Xmx2g -jar snpEff.jar download -dataDir $SNPEFF_DATA GRCh37.75
-    java -Xmx2g -jar snpEff.jar download -dataDir $SNPEFF_DATA GRCh38.78
+    java -Xmx2g -jar snpEff.jar download -dataDir $SNPEFF_DATA GRCh38.81
 
 Test running snpEff on any available GRCh37 and GRCh38 VCFs:
 
     java -Xmx4g -jar snpEff.jar eff -dataDir $SNPEFF_DATA GRCh37.75 ~/vep/example_GRCh37.vcf > example_GRCh37.snpeff.vcf
-    java -Xmx4g -jar snpEff.jar eff -dataDir $SNPEFF_DATA GRCh38.78 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
+    java -Xmx4g -jar snpEff.jar eff -dataDir $SNPEFF_DATA GRCh38.81 ~/vep/example_GRCh38.vcf > example_GRCh38.snpeff.vcf
 
 Authors
 -------

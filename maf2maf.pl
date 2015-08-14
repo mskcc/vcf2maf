@@ -16,8 +16,8 @@ use Config;
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4,
-    "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
-my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
+    "$ENV{HOME}/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $species, $ncbi_build, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
@@ -36,8 +36,8 @@ my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id 
     Feature_type Consequence cDNA_position CDS_position Protein_position Amino_acids Codons
     Existing_variation ALLELE_NUM DISTANCE STRAND SYMBOL SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL
     CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen EXON INTRON DOMAINS GMAF AFR_MAF
-    AMR_MAF ASN_MAF EUR_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED MOTIF_NAME MOTIF_POS
-    HIGH_INF_POS MOTIF_SCORE_CHANGE );
+    AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED MOTIF_NAME
+    MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL HGVS_OFFSET PHENO );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -64,6 +64,8 @@ GetOptions(
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
+    'species=s' => \$species,
+    'ncbi-build=s' => \$ncbi_build,
     'ref-fasta=s' => \$ref_fasta,
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
@@ -78,7 +80,6 @@ my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/v
 
 # Create a temporary directory for our intermediate files, unless the user wants to use their own
 if( $tmp_dir ) {
-    rmtree( $tmp_dir );
     mkpath( $tmp_dir );
 }
 else {
@@ -92,9 +93,8 @@ my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $
     "--nrm-vad-col $nrm_vad_col";
 system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf!\nCommand: $maf2vcf_cmd\n";
 
-my $vcf_file = "$tmp_dir/" . substr( $input_maf, rindex($input_maf, '/')+1 );
-$vcf_file =~ s/\.(txt|maf)*$/.vcf/;
-$vcf_file .= '.vcf' if( $vcf_file !~ /\.vcf$/ );
+my $vcf_file = "$tmp_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
+$vcf_file =~ s/(\.)?(maf|tsv|txt)?$/.vcf/;
 my $vep_anno = $vcf_file;
 $vep_anno =~ s/\.vcf$/.vep.vcf/;
 
@@ -109,57 +109,74 @@ else {
     ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
     
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --quiet --offline --no_stats --everything --shift_hgvs --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $vcf_file --output_file $vep_anno";
-    $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
-    
+    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --regulatory --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $vcf_file --output_file $vep_anno";
+    $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 ); # VEP barks if it's set to 1
+    # Add options that only work on human variants
+    $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
+
+    # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
     ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
 }
 
+# Load the tumor-normal pairs from the TSV created by maf2vcf
 my $tsv_file = $vcf_file;
-$tsv_file =~ s/\.vcf$/.tsv/;
-my %tn_pair = map{ s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; split(/\t/, $_) }`egrep -v "^#" $tsv_file`;
+$tsv_file =~ s/(\.vcf)?$/.pairs.tsv/;
+my %tn_pair = map{ chomp; split( "\t", $_ )}`egrep -v "^#" $tsv_file`;
+my %tn_vcf_idx = ();
 
+# Store the VEP annotated VCF header so we can duplicate it for per-TN VCFs
+my $vep_vcf_header = `grep ^## $vep_anno`;
+
+# Split the multi-sample VEP annotated VCF into per-TN VCFs
 my ( @t_col_idx, %vep_fh );
 $vep_fh{ $vep_anno } = IO::File->new( $vep_anno ) or die "ERROR: Couldn't open file: $vep_anno\n";
-# Split multi-sample VEP annotation file
 while( my $line = $vep_fh{ $vep_anno }->getline ) {
-    # Skip comment lines
+
+    # Skip comment lines, but parse everything else including the column headers
     next if( $line =~ m/^##/ );
-    # Instead of a chomp, do a thorough removal of carriage returns, line feeds, and prefixed/suffixed whitespace
     my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
+
     # Parse the header line to map column names to their indexes
     if( $line =~ m/^#CHROM/ ) {
+
+        # Fill up %tn_vcf_idx with VCF column indexes of tumor-normal pairs
         my %n_col_idx;
-        foreach my $idx (9..$#cols){
-            if( exists $tn_pair{ $cols[$idx] } ){   # Store tumor indices
+        foreach my $idx ( 9..$#cols ){
+            if( defined $tn_pair{ $cols[$idx] }){
                 push( @t_col_idx, $idx );
-            }else{                                  # Store indices of matched normals
+            }
+            else {
                 $n_col_idx{ $cols[$idx] } = $idx;
             }
         }
-        # Store T-N pairing indices in hash table %tn_pair
-        map{ my $n_id = $tn_pair{$cols[$_]}; $tn_pair{$_} = $n_col_idx{$n_id} } @t_col_idx;
-        my $vep_header = `head $vep_anno | grep "^##"`;
+        map{ my $n_id = $tn_pair{$cols[$_]}; $tn_vcf_idx{$_} = $n_col_idx{$n_id} } @t_col_idx;
+
         # Initialize VCF header for each tumor-normal pair
         foreach my $t_idx ( @t_col_idx ){
-            my $n_idx = $tn_pair{ $t_idx }; my $key = "$t_idx\_VS_$n_idx";
-            my ( $t_id, $n_id ) = @cols[ $t_idx, $n_idx ];
-            $vep_fh{ $key } = IO::File->new( "$tmp_dir/$t_id\_vs_$n_id.vep.vcf" , ">" );
-            $vep_fh{ $key }->print( $vep_header . "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
+            my $n_idx = $tn_vcf_idx{ $t_idx };
+            my $key = "$t_idx\_vs_$n_idx";
+            my ( $t_id, $n_id ) = @cols[$t_idx,$n_idx];
+            my $tn_vcf_file = "$tmp_dir/$t_id\_vs_$n_id.vep.vcf";
+            $vep_fh{ $key } = IO::File->new( $tn_vcf_file, ">" ) or die "ERROR: Couldn't open file: $tn_vcf_file\n";
+            $vep_fh{ $key }->print( $vep_vcf_header . "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
         }
-        next;
     }
-    # Create a VEP annotation file for each tumor-normal pair
-    foreach my $t_idx ( @t_col_idx ){
-        my $n_idx = $tn_pair{ $t_idx };
-        next if ( $cols[ $t_idx ] eq './.' or  $cols[ $n_idx ] eq './.' );
-        $vep_fh{ "$t_idx\_VS_$n_idx" }->print( join( "\t", @cols[0..8, $t_idx, $n_idx] ) . "\n" );
+    # For all other lines containing variants, write it to the appropriate per-TN VCF
+    else {
+        foreach my $t_idx ( @t_col_idx ){
+            my $n_idx = $tn_vcf_idx{ $t_idx };
+            my @format_keys = split( /\:/, $cols[8] );
+            my $idx = 0;
+            my %t_info = map{( $format_keys[$idx++], $_ )} split( /\:/, $cols[$t_idx] );
+
+            # Skip variants where tumor genotype is null
+            next if ( $t_info{GT} eq './.' );
+            $vep_fh{ "$t_idx\_vs_$n_idx" }->print( join( "\t", @cols[0..8,$t_idx,$n_idx] ) . "\n" );
+        }
     }
 }
-
-foreach (keys %vep_fh) { $vep_fh{ $_ }->close };
-
+foreach( keys %vep_fh ) { $vep_fh{ $_ }->close };
 
 # For each VCF generated by maf2vcf above, contruct a vcf2maf command and run it
 my @vcfs = grep{ !m/.vep.vcf$/ and !m/$vcf_file/ } glob( "$tmp_dir/*.vcf" ); # Avoid reannotating annotated VCFs
@@ -300,7 +317,7 @@ __DATA__
 
  --input-maf      Path to input file in MAF format
  --output-maf     Path to output MAF file [Default: STDOUT]
- --tmp-dir        Folder to retain intermediate VCFs/MAFs after runtime [Default: usually under /tmp]
+ --tmp-dir        Folder to retain intermediate VCFs/MAFs after runtime [Default: usually /tmp]
  --tum-depth-col  Name of MAF column for read depth in tumor BAM [t_depth]
  --tum-rad-col    Name of MAF column for reference allele depth in tumor BAM [t_ref_count]
  --tum-vad-col    Name of MAF column for variant allele depth in tumor BAM [t_alt_count]
@@ -312,7 +329,9 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
+ --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
@@ -323,6 +342,7 @@ This script runs a given MAF through maf2vcf to generate per-TN-pair VCFs in a t
 =head1 AUTHORS
 
  Cyriac Kandoth (ckandoth@gmail.com)
+ Qingguo Wang (josephw10000@gmail.com)
 
 =head1 LICENSE
 

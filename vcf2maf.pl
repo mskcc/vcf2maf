@@ -11,18 +11,16 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 1, "$ENV{HOME}/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
-my ( $snpeff_path, $snpeff_data, $snpeff_db ) = ( "$ENV{HOME}/snpEff", "$ENV{HOME}/snpEff/data", "GRCh37.75" );
-my ( $ncbi_build, $maf_center, $min_hom_vaf ) = ( "GRCh37", ".", 0.7 );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $species, $ncbi_build, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
     Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Xxx X Ter * );
 
-# Prioritize Sequence Ontology terms from VEP/snpEff in order of severity, as estimated by Ensembl:
+# Prioritize Sequence Ontology terms in order of severity, as estimated by Ensembl:
 # http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
-# ::NOTE:: snpEff conversion to SO terms has caveats, so handle exceptions as necessary
 sub GetEffectPriority {
     my ( $effect ) = @_;
     $effect = '' unless( defined $effect );
@@ -161,16 +159,13 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 }
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
-my ( $man, $help, $use_snpeff ) = ( 0, 0, 0 );
-my ( $input_vcf, $vep_anno, $snpeff_anno, $output_maf, $custom_enst_file );
+my ( $man, $help ) = ( 0, 0 );
+my ( $input_vcf, $output_maf, $custom_enst_file );
 my ( $vcf_tumor_id, $vcf_normal_id );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
     'input-vcf=s' => \$input_vcf,
-    'use-snpeff!' => \$use_snpeff,
-    'input-vep=s' => \$vep_anno,
-    'input-snpeff=s' => \$snpeff_anno,
     'output-maf=s' => \$output_maf,
     'tumor-id=s' => \$tumor_id,
     'normal-id=s' => \$normal_id,
@@ -181,23 +176,13 @@ GetOptions(
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
     'ref-fasta=s' => \$ref_fasta,
-    'snpeff-path=s' => \$snpeff_path,
-    'snpeff-data=s' => \$snpeff_data,
-    'snpeff-db=s' => \$snpeff_db,
+    'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
     'maf-center=s' => \$maf_center,
     'min-hom-vaf=s' => \$min_hom_vaf
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
-
-# Check for valid input combinations
-if(( $input_vcf and $vep_anno ) or ( $input_vcf and $snpeff_anno ) or ( $vep_anno and $snpeff_anno )) {
-    die "ERROR: Please specify only one input file: input-vcf, input-vep, or input-snpeff\n";
-}
-elsif( $use_snpeff and ( $vep_anno or $snpeff_anno )) {
-    die "ERROR: The use-snpeff option can only be used with input-vcf\n";
-}
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
@@ -210,66 +195,38 @@ if( $custom_enst_file ) {
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
-# Annotate variants in given VCF to all possible transcripts, unless an annotated VCF was provided
-if( $vep_anno ) {
-    ( -s $vep_anno ) or die "ERROR: Provided VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
-    ( $vep_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
-}
-elsif( $snpeff_anno ) {
-    ( -s $snpeff_anno ) or die "ERROR: Provided snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
-    ( $snpeff_anno !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
-}
-elsif( $input_vcf ) {
+# Annotate variants in given VCF to all possible transcripts
+my $output_vcf;
+if( $input_vcf ) {
     ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
     ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 
-    # Run snpEff if user specifically asks for it. Otherwise, run VEP by default
-    if( $use_snpeff ) {
-        $snpeff_anno = $input_vcf;
-        $snpeff_anno =~ s/(\.vcf)*$/.snpeff.vcf/;
+    $output_vcf = $input_vcf;
+    $output_vcf =~ s/(\.vcf)*$/.vep.vcf/;
 
-        # Skip running snpEff if a snpEff-annotated VCF already exists
-        if( -s $snpeff_anno ) {
-            warn "WARNING: Annotated VCF already exists ($snpeff_anno). Skipping re-annotation.\n";
-        }
-        else {
-            warn "STATUS: Running snpEff and writing to: $snpeff_anno\n";
-            # Make sure we can find the snpEff jar file and config
-            unless( glob "$snpeff_path/snpEff.jar" and glob "$snpeff_path/snpEff.config" ) {
-                die "ERROR: Cannot find snpEff jar or config in path: $snpeff_path\n";
-            }
-
-            # Contruct snpEff command using some default options and run it
-            my $snpeff_cmd = "java -Xmx4g -jar $snpeff_path/snpEff.jar eff -config $snpeff_path/snpEff.config -dataDir $snpeff_data -noStats -sequenceOntology -hgvs $snpeff_db $input_vcf > $snpeff_anno";
-            system( $snpeff_cmd ) == 0 or die "\nERROR: Failed to run the snpEff annotator!\nCommand: $snpeff_cmd\n";
-            ( -s $snpeff_anno ) or warn "WARNING: snpEff-annotated VCF file is missing or empty!\nPath: $snpeff_anno\n";
-        }
+    # Skip running VEP if an annotated VCF already exists
+    if( -s $output_vcf ) {
+        warn "WARNING: Annotated VCF already exists ($output_vcf). Skipping re-annotation.\n";
     }
     else {
-        $vep_anno = $input_vcf;
-        $vep_anno =~ s/(\.vcf)*$/.vep.vcf/;
+        warn "STATUS: Running VEP and writing to: $output_vcf\n";
+        # Make sure we can find the VEP script and the reference FASTA
+        ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
+        ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
-        # Skip running VEP if a VEP-annotated VCF already exists
-        if( -s $vep_anno ) {
-            warn "WARNING: Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
-        }
-        else {
-            warn "STATUS: Running VEP and writing to: $vep_anno\n";
-            # Make sure we can find the VEP script and the reference FASTA
-            ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
-            ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
+        # Contruct VEP command using some default options and run it
+        my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --regulatory --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $input_vcf --output_file $output_vcf";
+        $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 ); # VEP barks if it's set to 1
+        # Add options that only work on human variants
+        $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
 
-            # Contruct VEP command using some default options and run it
-            my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --quiet --offline --no_stats --everything --shift_hgvs --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --assembly $ncbi_build --dir $vep_data --fasta $ref_fasta --vcf --input_file $input_vcf --output_file $vep_anno";
-            $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
-
-            system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-            ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
-        }
+        # Make sure it ran without error codes
+        system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
+        ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
     }
 }
 else {
-    die "ERROR: Please specify an input file: input-vcf, input-vep, or input-snpeff. STDIN is not supported.\n";
+    die "ERROR: Please specify an input file: input-vcf. STDIN is not supported.\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -284,32 +241,29 @@ my @maf_header = qw(
     Exon_Number t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count all_effects
 );
 
-# Add extra columns to the MAF depending on whether we used VEP or snpEff
-my @vepcsq_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position
+# Add extra annotation columns to the MAF in a consistent order
+my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position
     Protein_position Amino_acids Codons Existing_variation ALLELE_NUM DISTANCE STRAND SYMBOL
     SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen
-    EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EUR_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED
-    MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE );
-my @vepcsq_cols_format; # To store the actual order of VEP data, that may differ between runs
-my @snpeff_cols = qw( Effect Effect_Impact Functional_Class Codon_Change Amino_Acid_Change
-    Amino_Acid_Length Gene_Name Transcript_BioType Gene_Coding Transcript_ID Exon_Rank
-    Genotype_Number ERRORS WARNINGS );
-push( @maf_header, ( $vep_anno ? @vepcsq_cols : @snpeff_cols ));
+    EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
+    SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
+    TSL HGVS_OFFSET PHENO );
+my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
+push( @maf_header, @ann_cols );
 
-# Parse through each variant in the annotated VCF, pull out CSQ/EFF from the INFO column, and choose
+# Parse through each variant in the annotated VCF, pull out ANN/CSQ from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
-my $vcf_file = ( $vep_anno ? $vep_anno : $snpeff_anno );
-( -s $vcf_file ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $vcf_fh = IO::File->new( $vcf_file ) or die "ERROR: Couldn't open annotated VCF: $vcf_file!\n";
+( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
+my $vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
-    # Parse out the VEP CSQ format, which seems to differ between runs
-    if( $line =~ m/^##INFO=<ID=CSQ.*Format: (\S+)">$/ ) {
-        @vepcsq_cols_format = split( /\|/, $1 );
+    # Parse out the VEP ANN/CSQ format, which seems to differ between runs
+    if( $line =~ m/^##INFO=<ID=(ANN|CSQ).*Format: (\S+)">$/ ) {
+        @ann_cols_format = split( /\|/, $2 );
     }
     # Skip all other header lines
     next if( $line =~ m/^##/ );
@@ -334,8 +288,8 @@ while( my $line = $vcf_fh->getline ) {
     my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, 1 ))} split( /\;/, $info_line );
 
     # By default, the variant allele is the first (usually the only) allele listed under ALT
-    # If there are multiple ALT alleles, we will choose the allele specified in the tumor GT field
-    # If tumor GT undefined or ambiguous, we will choose the one with the most supporting read depth
+    # If there are multiple ALT alleles, choose the allele specified in the tumor GT field
+    # If tumor GT is undefined or ambiguous, choose the one with the most supporting read depth
     my @alleles = ( $ref, split( /,/, $alt ));
     my $var_allele_idx = 1;
 
@@ -428,7 +382,6 @@ while( my $line = $vcf_fh->getline ) {
 
         # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
         if(( defined $tum_depths[0] and defined $tum_depths[$var_allele_idx] ) and ( !defined $tum_info{DP} or $tum_info{DP} eq '.' )) {
-            warn "WARNING: DP undefined but ADs available. Setting DP to sum of allele depths in $format_line = " . $rest[$vcf_tumor_idx] . "\n";
             $tum_info{DP} = 0;
             map{$tum_info{DP} += $_ if($_ and $_ ne '.')} @tum_depths;
         }
@@ -535,7 +488,6 @@ while( my $line = $vcf_fh->getline ) {
 
         # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
         if(( defined $nrm_depths[0] and defined $nrm_depths[$var_allele_idx] ) and ( !defined $nrm_info{DP} or $nrm_info{DP} eq '.' )) {
-            warn "WARNING: DP undefined but ADs available. Setting DP to sum of allele depths in $format_line = " . $rest[$vcf_normal_idx] . "\n";
             $nrm_info{DP} = 0;
             map{$nrm_info{DP} += $_ if($_ and $_ ne '.')} @nrm_depths;
         }
@@ -569,15 +521,15 @@ while( my $line = $vcf_fh->getline ) {
     my $maf_effect; # A single effect per variant to report in the standard MAF columns
     my %maf_line = map{( $_, '' )} @maf_header; # Initialize MAF fields with blank strings
 
-    ### Parsing VEP consequences
-    # INFO:CSQ is a comma-delim list of VEP consequences, with pipe-delim details per consequence
-    # VEP replaces ',' in details with '&'. We'll assume that all '&'s we see, were formerly commas
+    # VEP provides a comma-delimited list of consequences, with pipe-delim details per consequence
+    # It replaces ',' in details with '&'. We'll assume that all '&'s we see, were formerly commas
     # "Consequence" might list multiple effects on the same transcript e.g. missense,splice_region
-    if( $info{CSQ} ) {
+    if( $info{ANN} or $info{CSQ} ) {
 
-        foreach my $csq_line ( split( /,/, $info{CSQ} )) {
+        my $ann_lines = ( $info{ANN} ? $info{ANN} : $info{CSQ} );
+        foreach my $ann_line ( split( /,/, $ann_lines )) {
             my $idx = 0;
-            my %effect = map{s/\&/,/g; ( $vepcsq_cols_format[$idx++], ( defined $_ ? $_ : '' ))} split( /\|/, $csq_line );
+            my %effect = map{s/\&/,/g; ( $ann_cols_format[$idx++], ( defined $_ ? $_ : '' ))} split( /\|/, $ann_line );
 
             # Remove transcript ID from HGVS codon/protein changes, to make it easier on the eye
             $effect{HGVSc} =~ s/^.*:// if( $effect{HGVSc} );
@@ -620,7 +572,7 @@ while( my $line = $vcf_fh->getline ) {
                 $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
             }
 
-            # Copy VEP CSQ data into MAF fields that don't share the same identifier
+            # Copy VEP data into MAF fields that don't share the same identifier
             $effect{Transcript_ID} = $effect{Feature};
             $effect{Exon_Number} = $effect{EXON};
             $effect{Hugo_Symbol} = ( $effect{SYMBOL} ? $effect{SYMBOL} : '' );
@@ -664,83 +616,8 @@ while( my $line = $vcf_fh->getline ) {
         # If none of the effects are tagged as canonical, then just report the top priority effect
         $maf_effect = $all_effects[0] unless( $maf_effect );
     }
+    else {
 
-    ### Parsing snpEff effects
-    # INFO:EFF is a comma-delimited list of snpEff effects, with pipe-delim details per effect
-    # But note the parentheses, the Effect defined separately, and the last two columns being optional
-    # Only AA lengths for coding transcripts are provided. So we're SOL for non-coding transcripts
-    # EFF = Effect ( Effect_Impact | Functional_Class | Codon_Change | Amino_Acid_Change | Amino_Acid_Length | Gene_Name | Transcript_BioType | Gene_Coding | Transcript_ID | Exon_Rank  | Genotype_Number [ | ERRORS | WARNINGS ] ) , ...
-    elsif( $info{EFF} ) {
-
-        foreach my $eff_line ( split( /,/, $info{EFF} )) {
-            if( $eff_line =~ /^(\w+)\((.+)\)$/ ) {
-                my $idx = 0;
-                my %effect = map{( $snpeff_cols[$idx++], ( defined $_ ? $_ : '' ))} ( $1, split( /\|/, $2 ));
-
-                # Copy snpEff EFF data into MAF fields that don't share the same identifier
-                $effect{Exon_Number} = $effect{Exon_Rank};
-                $effect{Hugo_Symbol} = ( $effect{Gene_Name} ? $effect{Gene_Name} : '' );
-
-                # HGVS formatted codon/protein changes need to be parsed out of Amino_Acid_Change
-                ( $effect{HGVSp}, $effect{HGVSc} ) = $effect{Amino_Acid_Change} =~ m/^(.*)\/(.*)$/;
-                $effect{HGVSc} = '' unless( $effect{HGVSc} );
-                $effect{HGVSp} = '' unless( $effect{HGVSp} );
-
-                # When snpEff fails to provide any value in Effect, tag it as an intergenic variant
-                $effect{Effect} = "intergenic_variant" unless( $effect{Effect} );
-
-                # Create a shorter HGVS protein format using 1-letter codes
-                if( $effect{HGVSp} ) {
-                    my $hgvs_p_short = $effect{HGVSp};
-                    while( $hgvs_p_short and my ( $find, $replace ) = each %aa3to1 ) {
-                        eval "\$hgvs_p_short =~ s{$find}{$replace}g";
-                    }
-                    $effect{HGVSp_Short} = $hgvs_p_short;
-                }
-
-                # Fix HGVSp_Short, CDS_position, and Protein_position for splice acceptor/donor variants
-                if( $effect{Effect} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
-                    my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
-                    if( defined $c_pos ) {
-                        $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
-                        my $p_pos = sprintf( "%.0f", ( $c_pos + $c_pos % 3 ) / 3 );
-                        $effect{HGVSp_Short} = "p.X" . $p_pos . "_splice";
-                        $effect{CDS_position} =~ s/^-(\/\d+)$/$c_pos$1/;
-                        $effect{Protein_position} =~ s/^-(\/\d+)$/$p_pos$1/;
-                    }
-                }
-
-                # Fix HGVSp_Short for Silent mutations, so it mentions the amino-acid and position
-                if( $effect{Effect} eq "synonymous_variant" ) {
-                    my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)\/\d+$/;
-                    my $aa = $effect{Amino_acids};
-                    $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
-                }
-
-                # Transcript length isn't reported, so we have to use AA length, where available
-                $effect{Amino_Acid_Length} = 0 unless( $effect{Amino_Acid_Length} );
-
-                # Skip effects on other ALT alleles
-                push( @all_effects, \%effect ) if( $effect{Genotype_Number} == $var_allele_idx );
-            }
-        }
-
-        # Sort effects first by transcript biotype, then by severity, and then by longest transcript
-        @all_effects = sort {
-            GetBiotypePriority( $a->{Transcript_BioType} ) <=> GetBiotypePriority( $b->{Transcript_BioType} ) ||
-            GetEffectPriority( $a->{Effect} ) <=> GetEffectPriority( $b->{Effect} ) ||
-            $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length}
-        } @all_effects;
-
-        # Find the highest priority effect with a gene symbol (usually the first one)
-        my ( $effect_with_gene_name ) = grep { $_->{Gene_Name} } @all_effects;
-        my $maf_gene = $effect_with_gene_name->{Gene_Name} if( $effect_with_gene_name );
-
-        # If the gene has user-defined custom isoform overrides, choose that instead
-        ( $maf_effect ) = grep { $_->{Gene_Name} and $_->{Gene_Name} eq $maf_gene and $_->{Transcript_ID} and $custom_enst{$_->{Transcript_ID}} } @all_effects;
-
-        # Find the effect on the longest transcript of that highest priority gene
-        ( $maf_effect ) = sort { $b->{Amino_Acid_Length} <=> $a->{Amino_Acid_Length} } grep { $_->{Gene_Name} eq $maf_gene } @all_effects unless( $maf_effect );
     }
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
@@ -844,23 +721,18 @@ __DATA__
 =head1 OPTIONS
 
  --input-vcf      Path to input file in VCF format
- --input-vep      Path to VEP-annotated VCF file
- --input-snpeff   Path to snpEff-annotated VCF file (must use -sequenceOntology)
  --output-maf     Path to output MAF file [Default: STDOUT]
  --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
  --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
  --custom-enst    List of custom ENST IDs that override canonical selection
- --use-snpeff     Use snpEff to annotate VCF, instead of the default VEP
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
- --snpeff-path    Folder containing snpEff.jar and snpEff.config [~/snpEff]
- --snpeff-data    Override for data_dir in snpEff.config [~/snpEff/data]
- --snpeff-db      Database version to use when running snpEff [GRCh37.75]
- --ncbi-build     NCBI reference assembly ID to report in MAF [GRCh37]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
+ --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --maf-center     Variant calling center to report in MAF [.]
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --help           Print a brief help message and quit
@@ -870,7 +742,7 @@ __DATA__
 
 To convert a VCF into a MAF, each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable.
 
-This script needs either VEP or snpEff - variant annotators that map effects of a variant on all possible genes and transcripts. For more info, see the README.
+This script needs VEP, a variant annotator that maps effects of a variant on all possible genes and transcripts. For more info, see the README.
 
 =head2 Relevant links:
 
@@ -879,8 +751,6 @@ This script needs either VEP or snpEff - variant annotators that map effects of 
  MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
  VEP: http://ensembl.org/info/docs/tools/vep/index.html
  VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
- snpEff: http://snpeff.sourceforge.net
- snpEff annotated VCF format: http://snpeff.sourceforge.net/SnpEff_manual.html#output
 
 =head1 AUTHORS
 
