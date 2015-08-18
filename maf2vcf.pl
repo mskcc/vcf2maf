@@ -51,7 +51,7 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
 my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
-my %vcf_fh = (); # Hash of VCF file handles to speed up writing per-TN pair VCFs
+my %tn_vcf = (); # In-memory cache to speed up writing per-TN pair VCFs
 my %vcf_col_pair = ();
 my %vcf_col_idx = ();
 my @var_pos = ();
@@ -86,12 +86,11 @@ while( my $line = $maf_fh->getline ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
             $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
             my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-            $vcf_fh{ $vcf_file } = IO::File->new( $vcf_file, ">" );
-            $vcf_fh{ $vcf_file }->print( "##fileformat=VCFv4.2\n" );
-            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
-            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
-            $vcf_fh{ $vcf_file }->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
-            $vcf_fh{ $vcf_file }->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n" );
+            $tn_vcf{$vcf_file} .= "##fileformat=VCFv4.2\n";
+            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
+            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n";
+            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n";
+            $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
             
             # Set genotype column indexes for the multi-sample VCF, and keep the pairing info
             $vcf_col_idx{ $t_id } = $idx++;
@@ -178,7 +177,7 @@ while( my $line = $maf_fh->getline ) {
     # Contruct a VCF formatted line and append it to the respective VCF
     my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
     my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
-    $vcf_fh{ $vcf_file }->print( "$vcf_line\n" );
+    $tn_vcf{$vcf_file} .= "$vcf_line\n";
 
     # Store VCF formatted data for the multi-sample VCF
     my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
@@ -188,7 +187,12 @@ while( my $line = $maf_fh->getline ) {
 }
 $maf_fh->close;
 
-foreach( keys %vcf_fh ){ $vcf_fh{ $_ }->close };
+# Write the cached contents of per-TN VCFs into files
+foreach my $vcf_file ( keys %tn_vcf ) {
+    my $tn_vcf_fh = IO::File->new( $vcf_file, ">" ) or die "ERROR: Fail to create file $vcf_file\n";
+    $tn_vcf_fh->print( $tn_vcf{$vcf_file} );
+    $tn_vcf_fh->close;
+}
 
 # Initialize header lines for the multi-sample VCF
 unless( defined $output_vcf ) {
