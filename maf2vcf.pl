@@ -126,8 +126,8 @@ while( my $line = $maf_fh->getline ) {
         warn "WARNING: Skipping variant at $chr:$pos without any variant alleles specified!\n";
         next;
     }
-    $al1 = $ref unless( $al1 );
-    $al2 = $ref unless( $al2 );
+    $al1 = $ref unless( defined $al1 );
+    $al2 = $ref unless( defined $al2 );
 
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
