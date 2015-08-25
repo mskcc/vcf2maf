@@ -122,7 +122,7 @@ while( my $line = $maf_fh->getline ) {
     $n_al2 = $ref unless( $n_al2 );
 
     # Make sure we have at least 1 variant allele. If 1 is unset, set it to the reference allele
-    if( !$al1 and !$al2 ) { 
+    if( !defined $al1 and !defined $al2 ) {
         warn "WARNING: Skipping variant at $chr:$pos without any variant alleles specified!\n";
         next;
     }
