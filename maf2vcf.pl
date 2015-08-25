@@ -130,7 +130,7 @@ while( my $line = $maf_fh->getline ) {
     $al2 = $ref unless( defined $al2 );
 
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
-    my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
+    my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
         --$pos if( $ref_len > $al1_len or $ref_len > $al2_len ); # Decrement POS for deletions only
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
@@ -138,7 +138,7 @@ while( my $line = $maf_fh->getline ) {
         $prefix_bp = uc( $prefix_bp );
         ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please specify --ref-fasta appropriately\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
-        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
+        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
 
     # To simplify setting tumor genotype later, ensure that $al2 is always non-REF
