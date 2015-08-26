@@ -122,15 +122,12 @@ else {
 # Load the tumor-normal pairs from the TSV created by maf2vcf
 my $tsv_file = $vcf_file;
 $tsv_file =~ s/(\.vcf)?$/.pairs.tsv/;
-# ::TODO:: If the same tumor is paired with different normals, treat them as separate TN-pairs
-my %tn_pair = map{ chomp; split( "\t", $_ )}`egrep -v ^# $tsv_file`;
-my ( %tn_vcf_idx, %tn_ids );
 
 # Store the VEP annotated VCF header so we can duplicate it for per-TN VCFs
 my $vep_vcf_header = `grep ^## $vep_anno`;
 
 # Split the multi-sample VEP annotated VCF into per-TN VCFs
-my ( @t_col_idx, %tn_vep );
+my ( %tn_pair, %t_col_idx, %n_col_idx, %tn_vep );
 my $vep_fh = IO::File->new( $vep_anno ) or die "ERROR: Couldn't open file: $vep_anno\n";
 while( my $line = $vep_fh->getline ) {
 
@@ -141,42 +138,51 @@ while( my $line = $vep_fh->getline ) {
     # Parse the header line to map column names to their indexes
     if( $line =~ m/^#CHROM/ ) {
 
-        # Fill up %tn_vcf_idx with VCF column indexes of tumor-normal pairs, and %tn_ids with IDs
-        my %n_col_idx;
-        foreach my $idx ( 9..$#cols ){
-            if( defined $tn_pair{ $cols[$idx] }){
-                push( @t_col_idx, $idx );
-            }
-            else {
-                $n_col_idx{ $cols[$idx] } = $idx;
-            }
-            $tn_ids{$idx} = $cols[$idx];
+        # Initialize VCF header and fill up %tn_pair for each tumor-normal pair
+        foreach ( `egrep -v ^# $tsv_file` ){
+            chomp;
+            my @ids = split( "\t", $_ );
+            $t_col_idx{ $ids[ 0 ] } = 1;
+            $n_col_idx{ $ids[ 1 ] } = 1;
+            # If the same tumor is paired with different normals, treat them as separate TN-pairs
+            $tn_pair{ $ids[ 0 ] }{ $ids[ 1 ] } = 1;
+            my $tn_vcf_file = "$tmp_dir/$ids[0]\_vs_$ids[1].vep.vcf";
+            $tn_vep{ $tn_vcf_file } = $vep_vcf_header . "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$ids[0]\t$ids[1]\n";
         }
-        map{ my $n_id = $tn_pair{$cols[$_]}; $tn_vcf_idx{$_} = $n_col_idx{$n_id} } @t_col_idx;
-
-        # Initialize VCF header for each tumor-normal pair
-        foreach my $t_idx ( @t_col_idx ){
-            my $n_idx = $tn_vcf_idx{ $t_idx };
-            my ( $t_id, $n_id ) = ( $tn_ids{$t_idx}, $tn_ids{$n_idx} );
-            my $tn_vcf_file = "$tmp_dir/$t_id\_vs_$n_id.vep.vcf";
-            $tn_vep{$tn_vcf_file} .= $vep_vcf_header . "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
+        # Save VCF column indexes of tumors and normals in %t_col_idx and %n_col_idx, respectively.
+        foreach my $idx ( 9..$#cols ){
+            my $id = $cols[ $idx ];
+            $t_col_idx{ $id } = $idx if( exists $t_col_idx{ $id } );
+            $n_col_idx{ $id } = $idx if( exists $n_col_idx{ $id } );
         }
     }
     # For all other lines containing variants, write it to the appropriate per-TN VCF
     else {
-        foreach my $t_idx ( @t_col_idx ){
-            my @format_keys = split( /\:/, $cols[8] );
-            my $idx = 0;
-            my %t_info = map{( $format_keys[$idx++], $_ )} split( /\:/, $cols[$t_idx] );
-
+        my $GT_idx;
+        my @format_keys = split( /\:/, $cols[8] );
+        map{ $GT_idx = $_ if( $format_keys[ $_ ] eq "GT" ) } ( 0..$#format_keys );
+        # Look for non-null normal genotypes
+        my @n_cols;
+        foreach my $n_id ( keys %n_col_idx ){
+            my $n_idx = $n_col_idx{ $n_id };
+            next if( $n_idx < 9 );
+            my @n_info = split( /\:/, $cols[ $n_idx ] );
+            ( $n_info[ $GT_idx ] eq './.' ) or push @n_cols, $n_id;
+        }
+        
+        foreach my $t_id ( keys %t_col_idx ){
+            my $t_idx = $t_col_idx{ $t_id };
+            next if( $t_idx < 9 );
+            my @t_info = split( /\:/, $cols[ $t_idx ] );
             # Skip variants for TN-pairs where the tumor genotype is null
-            next if ( $t_info{GT} eq './.' );
+            next if ( $t_info[ $GT_idx ] eq './.' );
 
             # Otherwise write it to the appropriate per-TN VCF file
-            my $n_idx = $tn_vcf_idx{ $t_idx };
-            my ( $t_id, $n_id ) = ( $tn_ids{$t_idx}, $tn_ids{$n_idx} );
-            my $tn_vcf_file = "$tmp_dir/$t_id\_vs_$n_id.vep.vcf";
-            $tn_vep{$tn_vcf_file} .= join( "\t", @cols[0..8,$t_idx,$n_idx] ) . "\n";
+            foreach my $n_id ( @n_cols ){
+                my $n_idx = $n_col_idx{ $n_id };
+                my $tn_vcf_file = "$tmp_dir/$t_id\_vs_$n_id.vep.vcf";
+                $tn_vep{ $tn_vcf_file } .= join( "\t", @cols[0..8,$t_idx,$n_idx] ) . "\n" if( exists $tn_pair{ $t_id }{ $n_id } );
+            }
         }
     }
 }

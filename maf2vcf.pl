@@ -52,7 +52,6 @@ my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $inp
 my $line_count = 0;
 my %col_idx = (); # Hash to map column names to column indexes
 my %tn_vcf = (); # In-memory cache to speed up writing per-TN pair VCFs
-my %vcf_col_pair = ();
 my %vcf_col_idx = ();
 my @var_pos = ();
 my %var_fmt = ();
@@ -79,8 +78,13 @@ while( my $line = $maf_fh->getline ) {
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
         my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome" $input_maf | cut -f $tn_idx | sort -u`;
 
-        # For each TN-pair in the MAF, initialize blank VCFs with proper VCF headers in output directory
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
+        # Create a T-N pairing TSV file, since it's lost in translation to multi-sample VCF
+        my $tsv_file = "$output_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
+        $tsv_file =~ s/(\.)?(maf|tsv|txt)?$/.pairs.tsv/;
+        my $tsv_fh = IO::File->new( $tsv_file, ">" ) or die "ERROR: Fail to create file $tsv_file\n";
+        $tsv_fh->print( "#Tumor_Sample_Barcode\tMatched_Norm_Sample_Barcode\n" );
+        # For each TN-pair in the MAF, initialize a blank VCF with proper VCF headers in output directory
         $idx = 0;
         foreach my $pair ( @tn_pair ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
@@ -93,10 +97,11 @@ while( my $line = $maf_fh->getline ) {
             $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
             
             # Set genotype column indexes for the multi-sample VCF, and keep the pairing info
-            $vcf_col_idx{ $t_id } = $idx++;
+            $vcf_col_idx{ $t_id } = $idx++ if ( !exists $vcf_col_idx{ $t_id } );
             $vcf_col_idx{ $n_id } = $idx++ if ( !exists $vcf_col_idx{ $n_id } );
-            $vcf_col_pair{ $t_id } = $n_id;
+            $tsv_fh->print( "$t_id\t$n_id\n" );
         }
+        $tsv_fh->close;
         next;
     }
 
@@ -214,14 +219,6 @@ foreach my $var ( @var_pos ) {
     $vcf_fh->print( "\n" );
 }
 $vcf_fh->close;
-
-# Also create a T-N pairing TSV file, since it's lost in translation to multi-sample VCF
-my $tsv_file = $output_vcf;
-$tsv_file =~ s/(\.vcf)?$/.pairs.tsv/;
-my $tsv_fh = IO::File->new( $tsv_file, ">" ) or die "ERROR: Fail to create file $tsv_file\n";
-$tsv_fh->print( "#Tumor_Sample_Barcode\tMatched_Norm_Sample_Barcode\n" );
-map{ $tsv_fh->print( "$_\t$vcf_col_pair{$_}\n" ) if( exists $vcf_col_pair{$_} )} @vcf_cols;
-$tsv_fh->close;
 
 # Make sure that we handled a positive non-zero number of lines in the MAF
 ( $line_count > 0 ) or die "ERROR: No variant lines in the input MAF!\n";
