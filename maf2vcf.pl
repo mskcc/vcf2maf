@@ -134,6 +134,9 @@ while( my $line = $maf_fh->getline ) {
     $al1 = $ref unless( defined $al1 );
     $al2 = $ref unless( defined $al2 );
 
+    # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
+    ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
+
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
@@ -163,8 +166,9 @@ while( my $line = $maf_fh->getline ) {
     }
 
     # Set tumor and normal genotypes (FORMAT tag GT in VCF)
-    my $t_gt = join( "/", $al_idx{$al1}, $al_idx{$al2} );
-    my $n_gt = join( "/", $al_idx{$n_al1}, $al_idx{$n_al2} );
+    my ( $t_gt, $n_gt ) = ( "0/1", "0/0" ); # Set defaults
+    $t_gt = join( "/", $al_idx{$al2}, $al_idx{$al1} ) if( $al_idx{$al1} ne "0" );
+    $n_gt = join( "/", $al_idx{$n_al2}, $al_idx{$n_al1} ) if( $al_idx{$n_al1} ne "0" or $al_idx{$n_al2} ne "0" );
 
     # Create the VCF's comma-delimited ALT field that must list all non-REF (variant) alleles
     my $alt = join( ",", @alleles[1..$#alleles] );

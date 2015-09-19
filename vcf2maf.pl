@@ -496,6 +496,11 @@ while( my $line = $vcf_fh->getline ) {
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
     my $start = my $stop = my $var_type = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
+    # Remove any prefixed reference bps from all alleles, using "-" for simple indels
+    while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
+        ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
+        --$ref_length; --$var_length; ++$pos;
+    }
     # Handle SNPs, DNPs, TNPs, or anything larger (ONP)
     if( $ref_length == $var_length ) {
         ( $start, $stop ) = ( $pos, $pos + $var_length - 1 );
@@ -504,11 +509,6 @@ while( my $line = $vcf_fh->getline ) {
     }
     # Handle all indels, including those complex ones which contain substitutions
     elsif( $ref_length != $var_length ) {
-        # Remove any prefixed reference bps from all alleles, using "-" for simple indels
-        while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
-            ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
-            --$ref_length; --$var_length; ++$pos;
-        }
         if( $ref_length < $var_length ) { # Handle insertions, and the special case for complex ones
             ( $start, $stop ) = ( $pos - 1, ( $ref eq "-" ? $pos : $pos + $ref_length - 1 ));
             $var_type = "INS";
