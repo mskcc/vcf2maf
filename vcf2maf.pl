@@ -99,8 +99,14 @@ sub GetBiotypePriority {
         'miRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'snRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'snoRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
+        'ribozyme' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
+        'sRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
+        'scaRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'rRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'lincRNA' => 3, # Long, intervening noncoding (linc) RNAs, that can be found in evolutionarily conserved, intergenic regions
+        'known_ncrna' => 4,
+        'vaultRNA' => 4, # Short non coding RNA genes that form part of the vault ribonucleoprotein complex
+        'macro_lncRNA' => 4, # unspliced lncRNAs that are several kb in size
         'Mt_tRNA' => 4, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'Mt_rRNA' => 4, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'antisense' => 5, # Has transcripts that overlap the genomic span (i.e. exon or introns) of a protein-coding locus on the opposite strand
@@ -131,6 +137,7 @@ sub GetBiotypePriority {
         'translated_unprocessed_pseudogene' => 8, # Pseudogenes that have mass spec data suggesting that they are also translated
         'transcribed_processed_pseudogene' => 8, # Pseudogene where protein homology or genomic structure indicates a pseudogene, but the presence of locus-specific transcripts indicates expression
         'transcribed_unprocessed_pseudogene' => 8, # Pseudogene where protein homology or genomic structure indicates a pseudogene, but the presence of locus-specific transcripts indicates expression
+        'transcribed_unitary_pseudogene' => 8, #Pseudogene where protein homology or genomic structure indicates a pseudogene, but the presence of locus-specific transcripts indicates expression
         'unitary_pseudogene' => 8, # A species specific unprocessed pseudogene without a parent gene, as it has an active orthologue in another species
         'unprocessed_pseudogene' => 8, # Pseudogene that can contain introns since produced by gene duplication
         'Mt_tRNA_pseudogene' => 8, # Non-coding RNAs predicted to be pseudogenes by the Ensembl pipeline
