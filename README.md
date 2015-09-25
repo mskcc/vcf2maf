@@ -74,8 +74,8 @@ Download and unpack VEP's offline cache for GRCh37, GRCh38, and GRCm38:
 Install the Ensembl API and download the reference FASTAs for GRCh37, GRCh38, and GRCm38:
 
     cd $VEP_PATH
-    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens,mus_musculus --ASSEMBLY GRCh38,GRCm38 --PLUGINS CADD,ExAC,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
-    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh37 --PLUGINS CADD,ExAC,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens,mus_musculus --ASSEMBLY GRCh38,GRCm38 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh37 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
