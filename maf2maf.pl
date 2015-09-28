@@ -37,7 +37,9 @@ my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id 
     Existing_variation ALLELE_NUM DISTANCE STRAND SYMBOL SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL
     CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen EXON INTRON DOMAINS GMAF AFR_MAF
     AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED MOTIF_NAME
-    MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL HGVS_OFFSET PHENO );
+    MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL HGVS_OFFSET PHENO
+    MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH
+    ExAC_AF_SAS );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -113,6 +115,8 @@ else {
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 ); # VEP barks if it's set to 1
     # Add options that only work on human variants
     $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
+    # Add options that only work on human variants mapped to the GRCh37 reference genome
+    $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.vep.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";

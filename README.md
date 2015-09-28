@@ -46,6 +46,8 @@ To follow these instructions, we'll assume you have these packaged essentials in
     ## OR ##
     sudo apt-get install -y curl rsync tar make perl perl-base
 
+You'll also need `samtools` and `tabix` in your `$PATH`, which can be found at [htslib.org](http://www.htslib.org/download/)
+
 Handle VEP's Perl dependencies using cpanminus to install them under `~/perl5`:
 
     curl -L http://cpanmin.us | perl - --notest -l ~/perl5 LWP::Simple LWP::Protocol::https Archive::Extract Archive::Tar Archive::Zip CGI DBI Time::HiRes
@@ -71,9 +73,8 @@ Download and unpack VEP's offline cache for GRCh37, GRCh38, and GRCm38:
     rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-81/variation/VEP/mus_musculus_vep_81_GRCm38.tar.gz $VEP_DATA
     cat $VEP_DATA/*_vep_81_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
 
-Install the Ensembl API and download the reference FASTAs for GRCh37, GRCh38, and GRCm38:
+Install the Ensembl API, the reference FASTAs for GRCh37/GRCh38/GRCm38, and some neat VEP plugins:
 
-    cd $VEP_PATH
     perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens,mus_musculus --ASSEMBLY GRCh38,GRCm38 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
     perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh37 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
 
@@ -81,9 +82,24 @@ Convert the offline cache for use with tabix, that significantly speeds up the l
 
     perl convert_cache.pl --species homo_sapiens,mus_musculus --version 81_GRCh37,81_GRCh38,81_GRCm38 --dir $VEP_DATA
 
-Test running VEP in offline mode, on the provided sample GRCh38 VCF:
+Download and tabix-index the VCF needed by VEP's ExAC plugin:
 
-    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh38 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/81_GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa --input_file example_GRCh38.vcf --output_file example_GRCh38.vep.txt
+    cd $VEP_DATA
+    curl -LO ftp://ftp.broadinstitute.org/pub/ExAC_release/release0.3/ExAC.r0.3.sites.vep.vcf.gz
+    tabix -p vcf ExAC.r0.3.sites.vep.vcf.gz
+
+Download and tabix-index the datafile needed by VEP's dbNSFP plugin:
+
+    cd $VEP_DATA
+    curl -LO ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.0c.zip
+    unzip dbNSFPv3.0c.zip
+    cat dbNSFP*chr* | bgzip -c > dbNSFP.gz
+    tabix -s 1 -b 2 -e 2 dbNSFP.gz
+
+Test running VEP in offline mode with the ExAC plugin, on the provided sample GRCh37 VCF:
+
+    cd $VEP_PATH
+    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.vep.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
 
 Authors
 -------
