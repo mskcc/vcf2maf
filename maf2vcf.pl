@@ -25,7 +25,7 @@ unless( @ARGV and $ARGV[0]=~m/^-/ ) {
 }
 
 # Parse options and print usage syntax on a syntax error, or if help was explicitly requested
-my ( $man, $help ) = ( 0, 0 );
+my ( $man, $help, $per_tn_vcfs ) = ( 0, 0, 0 );
 my ( $input_maf, $output_dir, $output_vcf );
 GetOptions(
     'help!' => \$help,
@@ -34,6 +34,7 @@ GetOptions(
     'output-dir=s' => \$output_dir,
     'output-vcf=s' => \$output_vcf,
     'ref-fasta=s' => \$ref_fasta,
+    'per-tn-vcfs!' => \$per_tn_vcfs,
     'tum-depth-col=s' => \$tum_depth_col,
     'tum-rad-col=s' => \$tum_rad_col,
     'tum-vad-col=s' => \$tum_vad_col,
@@ -89,12 +90,14 @@ while( my $line = $maf_fh->getline ) {
         foreach my $pair ( @tn_pair ) {
             my ( $t_id, $n_id ) = split( /\t/, $pair );
             $n_id = "NORMAL" unless( defined $n_id ); # Use a placeholder name for normal if its undefined
-            my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-            $tn_vcf{$vcf_file} .= "##fileformat=VCFv4.2\n";
-            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
-            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n";
-            $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n";
-            $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
+            if( $per_tn_vcfs ) {
+                my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
+                $tn_vcf{$vcf_file} .= "##fileformat=VCFv4.2\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n";
+                $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
+            }
             
             # Set genotype column indexes for the multi-sample VCF, and keep the pairing info
             $vcf_col_idx{ $t_id } = $idx++ if ( !exists $vcf_col_idx{ $t_id } );
@@ -184,9 +187,11 @@ while( my $line = $maf_fh->getline ) {
     my $n_fmt = "$n_gt:$n_rad,$n_vad:$n_dp";
 
     # Contruct a VCF formatted line and append it to the respective VCF
-    my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-    my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
-    $tn_vcf{$vcf_file} .= "$vcf_line\n";
+    if( $per_tn_vcfs ) {
+        my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
+        my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
+        $tn_vcf{$vcf_file} .= "$vcf_line\n";
+    }
 
     # Store VCF formatted data for the multi-sample VCF
     my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
@@ -197,10 +202,12 @@ while( my $line = $maf_fh->getline ) {
 $maf_fh->close;
 
 # Write the cached contents of per-TN VCFs into files
-foreach my $vcf_file ( keys %tn_vcf ) {
-    my $tn_vcf_fh = IO::File->new( $vcf_file, ">" ) or die "ERROR: Fail to create file $vcf_file\n";
-    $tn_vcf_fh->print( $tn_vcf{$vcf_file} );
-    $tn_vcf_fh->close;
+if( $per_tn_vcfs ) {
+    foreach my $vcf_file ( keys %tn_vcf ) {
+        my $tn_vcf_fh = IO::File->new( $vcf_file, ">" ) or die "ERROR: Fail to create file $vcf_file\n";
+        $tn_vcf_fh->print( $tn_vcf{$vcf_file} );
+        $tn_vcf_fh->close;
+    }
 }
 
 # Initialize header lines for the multi-sample VCF
@@ -244,6 +251,7 @@ __DATA__
  --output-dir     Path to output directory where VCFs will be stored, one per TN-pair
  --output-vcf     Path to output multi-sample VCF containing all TN-pairs [<output-dir>/<input-maf-name>.vcf]
  --ref-fasta      Path to reference Fasta file [~/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --per-tn-vcfs    Specify this to generate VCFs per-TN pair, in addition to the multi-sample VCF
  --tum-depth-col  Name of MAF column for read depth in tumor BAM [t_depth]
  --tum-rad-col    Name of MAF column for reference allele depth in tumor BAM [t_ref_count]
  --tum-vad-col    Name of MAF column for variant allele depth in tumor BAM [t_alt_count]

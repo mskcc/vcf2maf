@@ -92,7 +92,7 @@ else {
 my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir " .
     "--ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
     "--tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col ".
-    "--nrm-vad-col $nrm_vad_col";
+    "--nrm-vad-col $nrm_vad_col --per-tn-vcfs";
 system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf!\nCommand: $maf2vcf_cmd\n";
 
 my $vcf_file = "$tmp_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
