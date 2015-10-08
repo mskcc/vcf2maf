@@ -91,6 +91,7 @@ sub GetBiotypePriority {
         'IG_C_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_D_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_J_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
+        'IG_LV_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_V_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'TR_C_gene' => 2, # T-cell receptor (TcR) genes imported or annotated according to the IMGT
         'TR_D_gene' => 2, # T-cell receptor (TcR) genes imported or annotated according to the IMGT
