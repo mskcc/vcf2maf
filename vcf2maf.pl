@@ -150,6 +150,7 @@ sub GetBiotypePriority {
         'misc_RNA_pseudogene' => 8, # Non-coding RNAs predicted to be pseudogenes by the Ensembl pipeline
         'miRNA_pseudogene' => 8, # Non-coding RNAs predicted to be pseudogenes by the Ensembl pipeline
         'IG_C_pseudogene' => 8, # Inactivated immunoglobulin gene
+        'IG_D_pseudogene' => 8, # Inactivated immunoglobulin gene
         'IG_J_pseudogene' => 8, # Inactivated immunoglobulin gene
         'IG_V_pseudogene' => 8, # Inactivated immunoglobulin gene
         'TR_J_pseudogene' => 8, # Inactivated immunoglobulin gene
