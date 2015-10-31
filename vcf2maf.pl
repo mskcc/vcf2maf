@@ -11,7 +11,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
 my ( $species, $ncbi_build, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
@@ -91,6 +91,7 @@ sub GetBiotypePriority {
         'IG_C_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_D_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_J_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
+        'IG_LV_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'IG_V_gene' => 2, # Immunoglobulin (Ig) variable chain genes imported or annotated according to the IMGT
         'TR_C_gene' => 2, # T-cell receptor (TcR) genes imported or annotated according to the IMGT
         'TR_D_gene' => 2, # T-cell receptor (TcR) genes imported or annotated according to the IMGT
@@ -149,6 +150,7 @@ sub GetBiotypePriority {
         'misc_RNA_pseudogene' => 8, # Non-coding RNAs predicted to be pseudogenes by the Ensembl pipeline
         'miRNA_pseudogene' => 8, # Non-coding RNAs predicted to be pseudogenes by the Ensembl pipeline
         'IG_C_pseudogene' => 8, # Inactivated immunoglobulin gene
+        'IG_D_pseudogene' => 8, # Inactivated immunoglobulin gene
         'IG_J_pseudogene' => 8, # Inactivated immunoglobulin gene
         'IG_V_pseudogene' => 8, # Inactivated immunoglobulin gene
         'TR_J_pseudogene' => 8, # Inactivated immunoglobulin gene
@@ -634,7 +636,7 @@ while( my $line = $vcf_fh->getline ) {
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
-    $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Hugo_Symbol} );
+    $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
     $maf_line{Entrez_Gene_Id} = '0';
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
@@ -742,7 +744,7 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --maf-center     Variant calling center to report in MAF [.]

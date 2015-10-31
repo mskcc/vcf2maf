@@ -16,7 +16,7 @@ use Config;
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4,
-    "$ENV{HOME}/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" );
+    "$ENV{HOME}/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
 my ( $species, $ncbi_build, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
@@ -92,7 +92,7 @@ else {
 my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir " .
     "--ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
     "--tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col ".
-    "--nrm-vad-col $nrm_vad_col";
+    "--nrm-vad-col $nrm_vad_col --per-tn-vcfs";
 system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf!\nCommand: $maf2vcf_cmd\n";
 
 my $vcf_file = "$tmp_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
@@ -351,7 +351,7 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
