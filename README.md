@@ -1,7 +1,7 @@
 vcf2maf
 =======
 
-[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.14107.svg)](http://dx.doi.org/10.5281/zenodo.14107)
+[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.14107.svg)](http://dx.doi.org/10.5281/zenodo.14107) [![Build Status](https://travis-ci.org/mskcc/vcf2maf.svg?branch=master)](https://travis-ci.org/mskcc/vcf2maf)
 
 To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable. And the default criteria must lean towards best practices.
 
@@ -48,30 +48,39 @@ To follow these instructions, we'll assume you have these packaged essentials in
 
 You'll also need `samtools` and `tabix` in your `$PATH`, which can be found at [htslib.org](http://www.htslib.org/download/)
 
-Handle VEP's Perl dependencies using cpanminus to install them under `~/perl5`:
+Set PERL_PATH to where you want to install additional perl libraries. Change this as needed:
 
-    curl -L http://cpanmin.us | perl - --notest -l ~/perl5 LWP::Simple LWP::Protocol::https Archive::Extract Archive::Tar Archive::Zip CGI DBI Time::HiRes
+    export PERL_PATH=~/perl5
+
+Handle VEP's Perl dependencies using cpanminus to install them under $PERL_PATH:
+
+    curl -L http://cpanmin.us | perl - --notest -l $PERL_PATH LWP::Simple LWP::Protocol::https Archive::Extract Archive::Tar Archive::Zip CGI DBI Time::HiRes
 
 Set PERL5LIB to find those libraries. Add this to the end of your `~/.bashrc` to make it persistent:
 
-    export PERL5LIB=~/perl5/lib/perl5:~/perl5/lib/perl5/x86_64-linux
+    export PERL5LIB=$PERL_PATH/lib/perl5:$PERL_PATH/lib/perl5/x86_64-linux
 
-Create temporary shell variables pointing to where we'll store VEP and its cache data (non default paths can be used, but specify `--vep-path` and `--vep-data` when running vcf2maf):
+Create temporary shell variables pointing to where we'll store VEP and its cache data (non default paths can be used, but specify `--vep-path` and `--vep-data` when running vcf2maf oe maf2maf):
 
     export VEP_PATH=~/vep
     export VEP_DATA=~/.vep
 
-Download the v81 release of VEP:
+Download the v82 release of VEP:
 
     mkdir $VEP_PATH $VEP_DATA; cd $VEP_PATH
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/81.tar.gz
-    tar -zxf 81.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/82.tar.gz
+    tar -zxf 82.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+
+Add that path to `PERL5LIB`, and the htslib subfolder to `PATH` where `tabix` will be installed:
+
+    export PERL5LIB=$VEP_PATH:$PERL5LIB
+    export PATH=$VEP_PATH/htslib:$PATH
 
 Download and unpack VEP's offline cache for GRCh37, GRCh38, and GRCm38:
 
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-81/variation/VEP/homo_sapiens_vep_81_GRCh{37,38}.tar.gz $VEP_DATA
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-81/variation/VEP/mus_musculus_vep_81_GRCm38.tar.gz $VEP_DATA
-    cat $VEP_DATA/*_vep_81_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-82/variation/VEP/homo_sapiens_vep_82_GRCh{37,38}.tar.gz $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-82/variation/VEP/mus_musculus_vep_82_GRCm38.tar.gz $VEP_DATA
+    cat $VEP_DATA/*_vep_82_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
 
 Install the Ensembl API, the reference FASTAs for GRCh37/GRCh38/GRCm38, and some neat VEP plugins:
 
@@ -80,7 +89,7 @@ Install the Ensembl API, the reference FASTAs for GRCh37/GRCh38/GRCm38, and some
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
-    perl convert_cache.pl --species homo_sapiens,mus_musculus --version 81_GRCh37,81_GRCh38,81_GRCm38 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens,mus_musculus --version 82_GRCh37,82_GRCh38,82_GRCm38 --dir $VEP_DATA
 
 Download and tabix-index the VCF needed by VEP's ExAC plugin:
 
@@ -91,7 +100,7 @@ Download and tabix-index the VCF needed by VEP's ExAC plugin:
 Download and tabix-index the datafile needed by VEP's dbNSFP plugin:
 
     cd $VEP_DATA
-    curl -LO ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.0c.zip
+    curl -L ftp://dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.0c.zip > dbNSFP/dbNSFPv3.0c.zip
     unzip dbNSFPv3.0c.zip
     cat dbNSFP*chr* | bgzip -c > dbNSFP.gz
     tabix -s 1 -b 2 -e 2 dbNSFP.gz
@@ -99,7 +108,7 @@ Download and tabix-index the datafile needed by VEP's dbNSFP plugin:
 Test running VEP in offline mode with the ExAC plugin, on the provided sample GRCh37 VCF:
 
     cd $VEP_PATH
-    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/81_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.vep.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
+    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.vep.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
 
 Authors
 -------
