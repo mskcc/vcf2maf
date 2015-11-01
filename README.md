@@ -91,24 +91,14 @@ Convert the offline cache for use with tabix, that significantly speeds up the l
 
     perl convert_cache.pl --species homo_sapiens,mus_musculus --version 82_GRCh37,82_GRCh38,82_GRCm38 --dir $VEP_DATA
 
-Download and tabix-index the VCF needed by VEP's ExAC plugin:
+Download and index a custom ExAC r0.3 VCF, that skips variants overlapping known somatic hotspots:
 
-    cd $VEP_DATA
-    curl -LO ftp://ftp.broadinstitute.org/pub/ExAC_release/release0.3/ExAC.r0.3.sites.vep.vcf.gz
-    tabix -p vcf ExAC.r0.3.sites.vep.vcf.gz
-
-Download and tabix-index the datafile needed by VEP's dbNSFP plugin:
-
-    cd $VEP_DATA
-    curl -L ftp://dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.0c.zip > dbNSFP/dbNSFPv3.0c.zip
-    unzip dbNSFPv3.0c.zip
-    cat dbNSFP*chr* | bgzip -c > dbNSFP.gz
-    tabix -s 1 -b 2 -e 2 dbNSFP.gz
+    curl -L https://googledrive.com/host/0B6o74flPT8FAYnBJTk9aTF9WVnM > $VEP_DATA/ExAC.r0.3.sites.minus_somatic.vcf.gz
+    tabix -p vcf $VEP_DATA/ExAC.r0.3.sites.minus_somatic.vcf.gz
 
 Test running VEP in offline mode with the ExAC plugin, on the provided sample GRCh37 VCF:
 
-    cd $VEP_PATH
-    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.vep.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
+    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.minus_somatic.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
 
 Authors
 -------

@@ -86,3 +86,4 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 105. ExAC_AF_NFE - Non-Finnish European Allele Frequency from ExAC
 106. ExAC_AF_OTH - Other Allele Frequency from ExAC
 107. ExAC_AF_SAS - South Asian Allele Frequency from ExAC
+108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait

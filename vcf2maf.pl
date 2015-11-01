@@ -214,22 +214,19 @@ if( $input_vcf ) {
     $output_vcf =~ s/(\.vcf)*$/.vep.vcf/;
 
     # Skip running VEP if an annotated VCF already exists
-    if( -s $output_vcf ) {
-        warn "WARNING: Annotated VCF already exists ($output_vcf). Skipping re-annotation.\n";
-    }
-    else {
+    unless( -s $output_vcf ) {
         warn "STATUS: Running VEP and writing to: $output_vcf\n";
         # Make sure we can find the VEP script and the reference FASTA
         ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
         ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
         # Contruct VEP command using some default options and run it
-        my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --regulatory --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $input_vcf --output_file $output_vcf";
+        my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --regulatory --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $input_vcf --output_file $output_vcf";
         $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 ); # VEP barks if it's set to 1
         # Add options that only work on human variants
         $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
         # Add options that only work on human variants mapped to the GRCh37 reference genome
-        $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.vep.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
+        $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.minus_somatic.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
 
         # Make sure it ran without error codes
         system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
@@ -259,7 +256,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO );
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 

@@ -147,7 +147,7 @@ while( my $line = $maf_fh->getline ) {
         my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
         $prefix_bp = uc( $prefix_bp );
-        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please specify --ref-fasta appropriately\n";
+        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please check that you chose the right reference genome with --ref-fasta:\n$ref_fasta\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
         ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
@@ -263,7 +263,7 @@ __DATA__
 
 =head1 DESCRIPTION
 
-This script breaks down variants in a MAF into VCFs for each tumor-normal pair, in preparation for annotation with vcf2maf
+This script breaks down variants in a MAF into VCFs for each tumor-normal pair, in preparation for annotation with VEP. Creates a multi-sample VCF in addition to per-TN pair.
 
 =head2 Relevant links:
 

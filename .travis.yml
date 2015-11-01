@@ -1,6 +1,30 @@
 # Reference: http://docs.travis-ci.com/user/languages/perl/
 language: perl
 perl:
-  - "5.18"
-  - "5.14"
-  - "5.10"
+  - "5.22"
+
+branches:
+  only:
+    - master
+
+env:
+  - VEP_PATH=~/vep
+  - VEP_DATA=~/.vep
+  - PERL5LIB=$VEP_PATH:$PERL5LIB
+  - PATH=$VEP_PATH/htslib:$PATH
+
+before_install:
+  - sudo apt-get install -y curl rsync tar make perl perl-base
+  - cpanm --notest LWP::Simple LWP::Protocol::https Archive::Extract Archive::Tar Archive::Zip CGI DBI Time::HiRes
+
+install:
+  - mkdir $VEP_PATH $VEP_DATA
+  - cd $VEP_PATH
+  - curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/82.tar.gz
+  - tar -zxf 82.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+  - perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens --ASSEMBLY GRCh37 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+  - perl convert_cache.pl --species homo_sapiens --version 82_GRCh37 --dir $VEP_DATA
+  - cd $TRAVIS_BUILD_DIR
+
+script:
+  - perl maf2maf.pl --input-maf data/test.maf --output-maf test.vep.maf --tmp-dir anno_files --custom-enst data/isoform_overrides_at_mskcc --vep-forks 1
