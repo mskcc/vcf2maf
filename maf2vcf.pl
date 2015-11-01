@@ -140,14 +140,19 @@ while( my $line = $maf_fh->getline ) {
     # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
 
+    # Make a version of chrom without chr-prefixes, and chrM renamed to MT
+    my $no_prefix_chr = $chr;
+    $no_prefix_chr =~ s/chrM/MT/;
+    $no_prefix_chr =~ s/^chr//;
+    
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
         --$pos if( $ref_len > $al1_len or $ref_len > $al2_len ); # Decrement POS for deletions only
-        my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
+        my $prefix_bp = `$samtools faidx $ref_fasta $no_prefix_chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
         $prefix_bp = uc( $prefix_bp );
-        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please check that you chose the right reference genome with --ref-fasta:\n$ref_fasta\n";
+        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $no_prefix_chr:$pos! Please check that you chose the right reference genome with --ref-fasta:\n$ref_fasta\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
         ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
