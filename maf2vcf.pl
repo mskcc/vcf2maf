@@ -142,8 +142,8 @@ while( my $line = $maf_fh->getline ) {
 
     # Make a version of chrom without chr-prefixes, and chrM renamed to MT
     my $no_prefix_chr = $chr;
-    $no_prefix_chr =~ s/chrM/MT/;
     $no_prefix_chr =~ s/^chr//;
+    $no_prefix_chr =~ s/^M$/MT/;
     
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
