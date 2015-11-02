@@ -113,7 +113,7 @@ while( my $line = $maf_fh->getline ) {
     $line_count++;
 
     # For a variant in the MAF, parse out the bare minimum data needed by a VCF
-    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : undef )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
 
     # Make sure that our minimum required columns contain proper data
     map{( !m/^\s*$/ ) or die "ERROR: $_ is empty in MAF line $line_count!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Sample_Barcode );
@@ -123,19 +123,19 @@ while( my $line = $maf_fh->getline ) {
     my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{ my $c = lc; (( defined $col_idx{$c} and defined $cols[$col_idx{$c}] and $cols[$col_idx{$c}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$c}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
     # Normal sample ID could be undefined for legit reasons, but we need a placeholder name
-    $n_id = "NORMAL" unless( $n_id );
+    $n_id = "NORMAL" if( $n_id eq "" );
 
     # If normal alleles are unset in the MAF (quite common), assume homozygous reference
-    $n_al1 = $ref unless( $n_al1 );
-    $n_al2 = $ref unless( $n_al2 );
+    $n_al1 = $ref if( $n_al1 eq "" );
+    $n_al2 = $ref if( $n_al2 eq "" );
 
     # Make sure we have at least 1 variant allele. If 1 is unset, set it to the reference allele
-    if( !defined $al1 and !defined $al2 ) {
+    if( $al1 eq "" and $al2 eq "" ) {
         warn "WARNING: Skipping variant at $chr:$pos without any variant alleles specified!\n";
         next;
     }
-    $al1 = $ref unless( defined $al1 );
-    $al2 = $ref unless( defined $al2 );
+    $al1 = $ref if( $al1 eq "" );
+    $al2 = $ref if( $al2 eq "" );
 
     # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
