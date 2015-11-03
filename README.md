@@ -31,9 +31,21 @@ If you have VEP in a different folder like `/opt/vep`, and cached in `/srv/vep`,
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.maf --vep-path /opt/vep --vep-data /srv/vep
 
-If you have a MAF-like file that you want to reannotate, then use `maf2maf`, which simply runs `maf2vcf` followed by `vcf2maf`:
+maf2maf
+-------
+
+If you have a MAF or a MAF-like file that you want to reannotate, then use `maf2maf`, which simply runs `maf2vcf` followed by `vcf2maf`:
 
     perl maf2maf.pl --input-maf data/test.maf --output-maf data/test.vep.maf
+
+After tests on variant lists from many sources, `maf2vcf` and `maf2maf` are quite good at dealing with formatting errors or "MAF-like" files. The bare minimum columns that it expects as input are:
+
+    Chromosome	Start_Position	Reference_Allele	Tumor_Seq_Allele2	Tumor_Sample_Barcode
+    1	3599659	C	T	TCGA-A1-A0SF-01
+    1	6676836	A	C	TCGA-A1-A0SF-01
+    1	7886690	G	A	TCGA-A1-A0SI-01
+
+See `data/minimalist_test_maf.tsv` for a sampler. Addition of `Tumor_Seq_Allele1` will be used to determine zygosity. Otherwise, it will try to determine zygosity from variant allele fractions, assuming that arguments `--tum-vad-col` and `--tum-depth-col` are set correctly to the names of columns containing those read counts. Specifying the `Matched_Norm_Sample_Barcode` with its respective columns containing read-counts, is also strongly recommended.
 
 Install VEP
 -----------
