@@ -578,7 +578,7 @@ while( my $line = $vcf_fh->getline ) {
 
             # Fix HGVSp_Short for Silent mutations, so it mentions the amino-acid and position
             if( $effect{Consequence} eq "synonymous_variant" ) {
-                my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)\/\d+$/;
+                my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)(-\d+)?\/\d+$/;
                 my $aa = $effect{Amino_acids};
                 $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
             }
