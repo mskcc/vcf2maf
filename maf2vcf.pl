@@ -117,7 +117,7 @@ while( my $line = $maf_fh->getline ) {
 
     # Make sure that our minimum required columns contain proper data
     map{( !m/^\s*$/ ) or die "ERROR: $_ is empty in MAF line $line_count!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Sample_Barcode );
-    ( $col_idx{tumor_seq_allele1} !~ m/^\s*$/ or $col_idx{tumor_seq_allele2} !~ m/^\s*$/ ) or die "ERROR: Tumor_Seq_Alleles must be non-empty in MAF line $line_count!\n";
+    (( $col_idx{tumor_seq_allele1} and $col_idx{tumor_seq_allele1} !~ m/^\s*$/ ) or ( $col_idx{tumor_seq_allele2} and $col_idx{tumor_seq_allele2} !~ m/^\s*$/ )) or die "ERROR: Tumor_Seq_Alleles must be non-empty in MAF line $line_count!\n";
 
     # Parse out read counts for ref/var alleles, if available
     my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{ my $c = lc; (( defined $col_idx{$c} and defined $cols[$col_idx{$c}] and $cols[$col_idx{$c}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$c}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
@@ -140,19 +140,14 @@ while( my $line = $maf_fh->getline ) {
     # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
 
-    # Make a version of chrom without chr-prefixes, and chrM renamed to MT
-    my $no_prefix_chr = $chr;
-    $no_prefix_chr =~ s/^chr//;
-    $no_prefix_chr =~ s/^M$/MT/;
-    
     # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
         --$pos if( $ref_len > $al1_len or $ref_len > $al2_len ); # Decrement POS for deletions only
-        my $prefix_bp = `$samtools faidx $ref_fasta $no_prefix_chr:$pos-$pos | grep -v ^\\>`;
+        my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
         chomp( $prefix_bp );
         $prefix_bp = uc( $prefix_bp );
-        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $no_prefix_chr:$pos! Please check that you chose the right reference genome with --ref-fasta:\n$ref_fasta\n";
+        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please check that you chose the correct reference genome with --ref-fasta:\n$ref_fasta\n";
         # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
         ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
