@@ -600,8 +600,8 @@ while( my $line = $vcf_fh->getline ) {
             ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/;
             $effect{Transcript_Length} = 0 unless( defined $effect{Transcript_Length} );
 
-            # Skip effects on other ALT alleles
-            push( @all_effects, \%effect ) if( $effect{ALLELE_NUM} == $var_allele_idx );
+            # Skip effects on other ALT alleles. If ALLELE_NUM is undefined (e.g. for INFO:SVTYPE), don't skip any
+            push( @all_effects, \%effect ) unless( $effect{ALLELE_NUM} and $effect{ALLELE_NUM} != $var_allele_idx );
         }
 
         # Sort effects first by transcript biotype, then by severity, and then by longest transcript
@@ -626,9 +626,6 @@ while( my $line = $vcf_fh->getline ) {
 
         # If none of the effects are tagged as canonical, then just report the top priority effect
         $maf_effect = $all_effects[0] unless( $maf_effect );
-    }
-    else {
-
     }
 
     # Construct the MAF columns from the $maf_effect hash, and print to output
