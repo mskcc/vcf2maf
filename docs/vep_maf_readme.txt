@@ -87,3 +87,4 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 106. ExAC_AF_OTH - Other Allele Frequency from ExAC
 107. ExAC_AF_SAS - South Asian Allele Frequency from ExAC
 108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
+109. FILTER - False-positive filtering status, first borrowed from the input MAF/VCF, and then sprinkled with magic

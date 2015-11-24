@@ -55,7 +55,8 @@ my %col_idx = (); # Hash to map column names to column indexes
 my %tn_vcf = (); # In-memory cache to speed up writing per-TN pair VCFs
 my %vcf_col_idx = ();
 my @var_pos = ();
-my %var_fmt = ();
+my %var_frmt = ();
+my %var_fltr = ();
 
 while( my $line = $maf_fh->getline ) {
 
@@ -80,11 +81,13 @@ while( my $line = $maf_fh->getline ) {
         my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome" $input_maf | cut -f $tn_idx | sort -u`;
 
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
+
         # Create a T-N pairing TSV file, since it's lost in translation to multi-sample VCF
         my $tsv_file = "$output_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
         $tsv_file =~ s/(\.)?(maf|tsv|txt)?$/.pairs.tsv/;
         my $tsv_fh = IO::File->new( $tsv_file, ">" ) or die "ERROR: Fail to create file $tsv_file\n";
         $tsv_fh->print( "#Tumor_Sample_Barcode\tMatched_Norm_Sample_Barcode\n" );
+
         # For each TN-pair in the MAF, initialize a blank VCF with proper VCF headers in output directory
         $idx = 0;
         foreach my $pair ( @tn_pair ) {
@@ -108,12 +111,15 @@ while( my $line = $maf_fh->getline ) {
         next;
     }
 
-    # Print an error if we got to this point without parsing a header line, and increment a counter for all non-header lines
+    # Print an error if we got to this point without parsing a header line
     ( %col_idx ) or die "ERROR: Couldn't find a header line in the MAF: $input_maf\n";
-    $line_count++;
+    $line_count++; # Increment a counter for all non-header lines, to help with debugging
 
-    # For a variant in the MAF, parse out the bare minimum data needed by a VCF
+    # For each variant in the MAF, parse out data that can go into the output VCF
     my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+
+    # Parse out the FILTER reasons if available, or set to "." if undefined
+    my ( $filter ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "." )} qw( FILTER );
 
     # Make sure that our minimum required columns contain proper data
     map{( !m/^\s*$/ ) or die "ERROR: $_ is empty in MAF line $line_count!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Sample_Barcode );
@@ -158,7 +164,7 @@ while( my $line = $maf_fh->getline ) {
     ( $n_al1, $n_al2 ) = ( $n_al2, $n_al1 ) if( $n_al2 eq $ref );
 
     # Fill an array with all unique REF/ALT alleles, and set their 0-based indexes like in a VCF
-    # Notice how we ensure that $alleles[0] is REF and #alleles[1] is the major ALT allele in tumor
+    # Notice how we ensure that $alleles[0] is REF and $alleles[1] is the major ALT allele in tumor
     my ( @alleles, %al_idx );
     my $idx = 0;
     foreach my $al ( $ref, $al2, $al1, $n_al2, $n_al1 ) {
@@ -189,15 +195,16 @@ while( my $line = $maf_fh->getline ) {
     # Contruct a VCF formatted line and append it to the respective VCF
     if( $per_tn_vcfs ) {
         my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-        my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, qw( . . . ), "GT:AD:DP", $t_fmt, $n_fmt );
+        my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, ".", $filter, ".", "GT:AD:DP", $t_fmt, $n_fmt );
         $tn_vcf{$vcf_file} .= "$vcf_line\n";
     }
 
     # Store VCF formatted data for the multi-sample VCF
     my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
-    push( @var_pos, $key ) unless( exists $var_fmt{ $key } );
-    $var_fmt{ $key }{ $vcf_col_idx{ $t_id } } = $t_fmt;
-    $var_fmt{ $key }{ $vcf_col_idx{ $n_id } } = $n_fmt;
+    push( @var_pos, $key ) unless( exists $var_frmt{ $key } );
+    $var_frmt{ $key }{ $vcf_col_idx{ $t_id } } = $t_fmt;
+    $var_frmt{ $key }{ $vcf_col_idx{ $n_id } } = $n_fmt;
+    $var_fltr{ $key } = $filter;
 }
 $maf_fh->close;
 
@@ -225,8 +232,8 @@ $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join
 
 # Write each variant into the multi-sample VCF
 foreach my $var ( @var_pos ) {
-    $vcf_fh->print( join( "\t", $var, qw( . . . ), "GT:AD:DP" ));
-    map{ $vcf_fh->print( "\t" . (( exists $var_fmt{$var}{$_} ) ? $var_fmt{$var}{$_} : './.:.:.' ))}( 0..$#vcf_cols );
+    $vcf_fh->print( join( "\t", $var, ".", $var_fltr{ $var }, ".", "GT:AD:DP" ));
+    map{ $vcf_fh->print( "\t" . (( exists $var_frmt{$var}{$_} ) ? $var_frmt{$var}{$_} : './.:.:.' ))}( 0..$#vcf_cols );
     $vcf_fh->print( "\n" );
 }
 $vcf_fh->close;

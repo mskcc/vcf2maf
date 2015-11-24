@@ -256,7 +256,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER );
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -279,6 +279,10 @@ while( my $line = $vcf_fh->getline ) {
 
     chomp( $line );
     my ( $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, @rest ) = split( /\t/, $line );
+
+    # Set QUAL and FILTER to "." unless defined and non-empty
+    $qual = "." unless( defined $qual and $qual ne "" );
+    $filter = "." unless( defined $filter and $filter ne "" );
 
     # If FORMATted genotype fields are available, find the sample with the variant, and matched normal
     if( $line =~ m/^#CHROM/ ) {
@@ -681,6 +685,21 @@ while( my $line = $vcf_fh->getline ) {
         my $refseq_ids = ( $effect->{RefSeq} ? $effect->{RefSeq} : '' );
         $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $gene_name and $effect_type and $transcript_id );
     }
+
+    # Apply FILTER from the input VCF, and also tag calls with high minor allele frequency in
+    # any EVS/1000G/ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
+    my ( $max_subpop_maf, $subpop_count ) = ( 0.0004, 0 );
+    foreach my $subpop ( qw( GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF )) {
+        my ( undef, $freq ) = split( ":", $maf_line{$subpop} );
+        $subpop_count++ if( defined $freq and $freq > $max_subpop_maf );
+    }
+    foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS )) {
+        $subpop_count++ if( $maf_line{$subpop} ne "" and $maf_line{$subpop} > $max_subpop_maf );
+    }
+    if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic|risk_factor|protective/ ) {
+        $filter = (( $filter eq "PASS" or $filter eq "." ) ? "Common_Variant" : "$filter,Common_Variant" );
+    }
+    $maf_line{FILTER} = $filter;
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
     $maf_fh->print( join( "\t", map{ $maf_line{$_} } @maf_header ) . "\n" );

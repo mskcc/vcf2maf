@@ -39,7 +39,7 @@ my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id 
     AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG SOMATIC PUBMED MOTIF_NAME
     MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL HGVS_OFFSET PHENO
     MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH
-    ExAC_AF_SAS GENE_PHENO );
+    ExAC_AF_SAS GENE_PHENO FILTER );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -238,10 +238,10 @@ if( $retain_cols ) {
             # Check if retaining columns not in old MAF, or that we shouldn't override in new MAF
             foreach my $c ( split( ",", $retain_cols )) {
                 my $c_lc = lc( $c );
-                if( !defined $input_maf_col_idx{$c_lc} ){
+                if( !defined $input_maf_col_idx{$c_lc} ) {
                     warn "WARNING: Column '$c' not found in old MAF.\n";
                 }
-                elsif( $force_new_cols{$c_lc} ){
+                elsif( $force_new_cols{$c_lc} ) {
                     warn "WARNING: Column '$c' cannot be overridden in new MAF.\n";
                 }
             }
