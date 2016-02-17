@@ -688,12 +688,8 @@ while( my $line = $vcf_fh->getline ) {
     }
 
     # Apply FILTER from the input VCF, and also tag calls with high minor allele frequency in
-    # any EVS/1000G/ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
+    # any ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
     my ( $max_subpop_maf, $subpop_count ) = ( 0.0004, 0 );
-    foreach my $subpop ( qw( GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF )) {
-        my ( undef, $freq ) = split( /:|,/, $maf_line{$subpop} );
-        $subpop_count++ if( defined $freq and $freq > $max_subpop_maf );
-    }
     foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS )) {
         $subpop_count++ if( $maf_line{$subpop} ne "" and $maf_line{$subpop} > $max_subpop_maf );
     }
