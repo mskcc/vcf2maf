@@ -294,8 +294,8 @@ if( $retain_cols ) {
             else {
                 my $key = join( ":", map{ my $c = lc; $cols[$output_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele Tumor_Seq_Allele2 ));
                 foreach my $c ( map{lc} split( /\t/, $maf_header )){
-                    if( !$force_new_cols{$c} and defined $input_maf_data{$key}{$c} ) {
-                        $cols[$output_maf_col_idx{$c}] = $input_maf_data{$key}{$c};
+                    if( !$force_new_cols{$c} ) {
+                        $cols[$output_maf_col_idx{$c}] = ( defined $input_maf_data{$key}{$c} ? $input_maf_data{$key}{$c} : "" );
                     }
                 }
                 $tmp_tn_maf_fh->print( join( "\t", @cols ) . "\n" );
