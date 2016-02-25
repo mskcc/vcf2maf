@@ -299,7 +299,7 @@ while( my $line = $vcf_fh->getline ) {
     }
 
     # Parse out the data in the info column, and store into a hash
-    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, 1 ))} split( /\;/, $info_line );
+    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "" ))} split( /\;/, $info_line );
 
     # By default, the variant allele is the first (usually the only) allele listed under ALT
     # If there are multiple ALT alleles, choose the allele specified in the tumor GT field
@@ -322,83 +322,8 @@ while( my $line = $vcf_fh->getline ) {
             $var_allele_idx = 1 unless( defined $var_allele_idx and $var_allele_idx =~ m/^\d+$/ );
         }
 
-        # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
-        if( defined $tum_info{AD} and $tum_info{AD} ne "." ) {
-            @tum_depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AD} );
-        }
-
-        # Handle VarScan VCF lines where AD contains only 1 depth, and REF allele depth is in RD
-        if( scalar( @tum_depths ) == 1 and defined $tum_info{RD} ) {
-            @tum_depths = map{""} @alleles;
-            $tum_depths[0] = $tum_info{RD};
-            $tum_depths[$var_allele_idx] = $tum_info{AD};
-        }
-        # Handle SomaticSniper VCF lines, where allele depths must be extracted from BCOUNT
-        elsif( defined $tum_info{BCOUNT} ) {
-            my %b_idx = ( A=>0, C=>1, G=>2, T=>3 );
-            my @bcount = split( /,/, $tum_info{BCOUNT} );
-            @tum_depths = map{(( defined $b_idx{$_} and defined $bcount[$b_idx{$_}] ) ? $bcount[$b_idx{$_}] : "" )} @alleles;
-        }
-        # Handle VCF SNV lines by Strelka, where allele depths are in AU:CU:GU:TU
-        elsif( scalar( grep{defined $tum_info{$_}} qw/AU CU GU TU/ ) == 4 ) {
-            # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
-            map{( $tum_info{$_.'U'} ) = split( ",", $tum_info{$_.'U'} )} qw( A C G T );
-
-            # If the ALT allele is just N, then set it to the allele with the highest non-ref readcount
-            if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
-                my %acgt_depths = map{( defined $tum_info{$_.'U'} ? ( $_, $tum_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
-                my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
-                ( $alleles[1] ) = ( $deepest[0] ne $ref ? $deepest[0] : $deepest[1] );
-            }
-            @tum_depths = map{( defined $tum_info{$_.'U'} ? $tum_info{$_.'U'} : "" )} @alleles;
-        }
-        # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
-        elsif( $tum_info{TIR} ) {
-            # Reference allele depth is not provided by Strelka for indels, so we have to skip it
-            @tum_depths = ( "", ( split /,/, $tum_info{TIR} )[0] );
-        }
-        # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
-        elsif( defined $tum_info{AO} and defined $tum_info{RO} ) {
-            @tum_depths = ( $tum_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $tum_info{AO} ));
-        }
-        # Handle VCF lines with ALT allele-frac in FA, which needs to be multiplied by DP to get AD
-        elsif( defined $tum_info{FA} and defined $tum_info{DP} and $tum_info{DP} ne '.' ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @tum_depths = map{""} @alleles;
-            $tum_depths[$var_allele_idx] = sprintf( "%.0f", $tum_info{FA} * $tum_info{DP} );
-        }
-        # Handle VCF lines where AD contains only 1 value, that we can assume is the variant allele
-        elsif( defined $tum_info{AD} and @tum_depths and scalar( @tum_depths ) == 1 ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @tum_depths = map{""} @alleles;
-            $tum_depths[$var_allele_idx] = $tum_info{AD};
-        }
-        # Handle VCF lines from mpileup/bcftools where DV contains the ALT allele depth
-        elsif( defined $tum_info{DV} and defined $tum_info{DP} ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @tum_depths = map{""} @alleles;
-            $tum_depths[$var_allele_idx] = $tum_info{DV};
-        }
-        # For all other lines where #depths is not equal to #alleles, blank out the depths
-        elsif( @tum_depths and $#tum_depths != $#alleles ) {
-            warn "WARNING: Unusual AD format for alleles $ref,$alt in $format_line = " . $rest[$vcf_tumor_idx] . "\n";
-            @tum_depths = map{""} @alleles;
-        }
-
-        # Sanity check that REF/ALT allele depths are lower than the total depth
-        if( defined $tum_info{DP} and $tum_info{DP} ne '.' and (( $tum_depths[0] and $tum_depths[0] > $tum_info{DP} ) or
-            ( $tum_depths[$var_allele_idx] and $tum_depths[$var_allele_idx] > $tum_info{DP} ) or
-            ( $tum_depths[0] and $tum_depths[$var_allele_idx] and $tum_depths[0] + $tum_depths[$var_allele_idx] > $tum_info{DP} ))) {
-            warn "WARNING: AD of alleles $ref,$alt exceed DP. Setting DP to sum of allele depths in $format_line = " . $rest[$vcf_tumor_idx] . "\n";
-            $tum_info{DP} = 0;
-            map{$tum_info{DP} += $_ if($_ and $_ ne '.')} @tum_depths;
-        }
-
-        # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
-        if(( defined $tum_depths[0] and defined $tum_depths[$var_allele_idx] ) and ( !defined $tum_info{DP} or $tum_info{DP} eq '.' )) {
-            $tum_info{DP} = 0;
-            map{$tum_info{DP} += $_ if($_ and $_ ne '.')} @tum_depths;
-        }
+        # Standardize AD and DP based on data in the genotype fields
+        FixAlleleDepths( \@alleles, $var_allele_idx, \%tum_info );
 
         # If genotype is undefined, use the allele depths collected to choose the major variant allele
         unless( defined $tum_info{GT} and $tum_info{GT} ne '.' and $tum_info{GT} ne "./." ) {
@@ -406,20 +331,16 @@ while( my $line = $vcf_fh->getline ) {
             for( my $i = 1; $i <= $#tum_depths; ++$i ) {
                 $var_allele_idx = $i if( $tum_depths[$i] and $tum_depths[$i] > $tum_depths[$var_allele_idx] );
             }
+            $tum_info{GT} = "./.";
+            if( defined $tum_info{DP} and $tum_info{DP} != 0 and defined $tum_depths[$var_allele_idx] ) {
+                my $vaf = $tum_depths[$var_allele_idx] / $tum_info{DP};
+                $tum_info{GT} = ( $vaf < $min_hom_vaf ? "0/1" : "1/1" );
+            }
         }
     }
 
     # Set the variant allele to whatever we selected above
     my $var = $alleles[$var_allele_idx];
-
-    # Unless GT is defined, assign het/hom status based on a simple variant allele fraction cutoff
-    unless( defined $tum_info{GT} and $tum_info{GT} ne "." and $tum_info{GT} ne "./." ) {
-        $tum_info{GT} = "./.";
-        if( defined $tum_info{DP} and $tum_info{DP} != 0 and defined $tum_depths[$var_allele_idx] ) {
-            my $vaf = $tum_depths[$var_allele_idx] / $tum_info{DP};
-            $tum_info{GT} = ( $vaf < $min_hom_vaf ? "0/1" : "1/1" );
-        }
-    }
 
     # Same as above, parse out info from the normal genotype field
     my ( %nrm_info, @nrm_depths );
@@ -428,83 +349,9 @@ while( my $line = $vcf_fh->getline ) {
         my $idx = 0;
         %nrm_info = map {( $format_keys[$idx++], $_ )} split( /\:/, $rest[$vcf_normal_idx] );
 
-        # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
-        if( defined $nrm_info{AD} and $nrm_info{AD} ne "." ) {
-            @nrm_depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $nrm_info{AD} );
-        }
-
-        # Handle VCF lines by VarScan where REF allele depth is stored separately in an RD tag
-        if( scalar( @nrm_depths ) == 1 and defined $nrm_info{RD} ) {
-            @nrm_depths = map{""} @alleles;
-            $nrm_depths[0] = $nrm_info{RD};
-            $nrm_depths[$var_allele_idx] = $nrm_info{AD};
-        }
-        # Handle VCF lines by SomaticSniper, where allele depths must be extracted from BCOUNT
-        elsif( defined $nrm_info{BCOUNT} ) {
-            my %b_idx = ( A=>0, C=>1, G=>2, T=>3 );
-            my @bcount = split( /,/, $nrm_info{BCOUNT} );
-            @nrm_depths = map{(( defined $b_idx{$_} and defined $bcount[$b_idx{$_}] ) ? $bcount[$b_idx{$_}] : "" )} @alleles;
-        }
-        # Handle VCF SNV lines by Strelka, where allele depths are in AU:CU:GU:TU
-        elsif( scalar( grep{defined $nrm_info{$_}} qw/AU CU GU TU/ ) == 4 ) {
-            # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
-            map{( $nrm_info{$_.'U'} ) = split( ",", $nrm_info{$_.'U'} )} qw( A C G T );
-
-            # If the ALT allele is just N, then set it to the allele with the highest non-ref readcount
-            if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
-                my %acgt_depths = map{( defined $nrm_info{$_.'U'} ? ( $_, $nrm_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
-                my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
-                ( $alleles[1] ) = ( $deepest[0] ne $ref ? $deepest[0] : $deepest[1] );
-            }
-            @nrm_depths = map{( defined $nrm_info{$_.'U'} ? $nrm_info{$_.'U'} : "" )} @alleles;
-        }
-        # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
-        elsif( $nrm_info{TIR} ) {
-            # Reference depth is not explicitly defined by Strelka for indels, so we have to skip it
-            @nrm_depths = ( "", ( split /,/, $nrm_info{TIR} )[0] );
-        }
-        # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
-        elsif( defined $nrm_info{AO} and defined $nrm_info{RO} ) {
-            @nrm_depths = ( $nrm_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $nrm_info{AO} ));
-        }
-        # Handle VCF lines with ALT allele-frac in FA, which needs to be multiplied by DP to get AD
-        elsif( defined $nrm_info{FA} and defined $nrm_info{DP} and $nrm_info{DP} ne '.' ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @nrm_depths = map{""} @alleles;
-            $nrm_depths[$var_allele_idx] = sprintf( "%.0f", $nrm_info{FA} * $nrm_info{DP} );
-        }
-        # Handle VCF lines where AD contains only 1 value, that we can assume is the variant allele
-        elsif( defined $nrm_info{AD} and @nrm_depths and scalar( @nrm_depths ) == 1 ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @nrm_depths = map{""} @alleles;
-            $nrm_depths[$var_allele_idx] = $nrm_info{AD};
-        }
-        # Handle VCF lines from mpileup/bcftools where DV contains the ALT allele depth
-        elsif( defined $nrm_info{DV} and defined $nrm_info{DP} ) {
-            # Reference allele depth and depths for any other ALT alleles must be left undefined
-            @nrm_depths = map{""} @alleles;
-            $nrm_depths[$var_allele_idx] = $nrm_info{DV};
-        }
-        # For all other lines where #depths is not equal to #alleles, blank out the depths
-        elsif( @nrm_depths and $#nrm_depths != $#alleles ) {
-            warn "WARNING: Unusual AD format for alleles $ref,$alt in $format_line = " . $rest[$vcf_normal_idx] . "\n";
-            @nrm_depths = map{""} @alleles;
-        }
-
-        # Sanity check that REF/ALT allele depths are lower than the total depth
-        if( defined $nrm_info{DP} and $nrm_info{DP} ne '.' and (( $nrm_depths[0] and $nrm_depths[0] > $nrm_info{DP} ) or
-            ( $nrm_depths[$var_allele_idx] and $nrm_depths[$var_allele_idx] > $nrm_info{DP} ) or
-            ( $nrm_depths[0] and $nrm_depths[$var_allele_idx] and $nrm_depths[0] + $nrm_depths[$var_allele_idx] > $nrm_info{DP} ))) {
-            warn "WARNING: AD of alleles $ref,$alt exceed DP. Setting DP to sum of allele depths in $format_line = " . $rest[$vcf_normal_idx] . "\n";
-            $nrm_info{DP} = 0;
-            map{$nrm_info{DP} += $_ if($_ and $_ ne '.')} @nrm_depths;
-        }
-
-        # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
-        if(( defined $nrm_depths[0] and defined $nrm_depths[$var_allele_idx] ) and ( !defined $nrm_info{DP} or $nrm_info{DP} eq '.' )) {
-            $nrm_info{DP} = 0;
-            map{$nrm_info{DP} += $_ if($_ and $_ ne '.')} @nrm_depths;
-        }
+        # Standardize AD and DP based on data in the genotype fields
+        FixAlleleDepths( \@alleles, $var_allele_idx, \%nrm_info );
+        $tum_info{GT} = "./." unless( defined $tum_info{GT} and $tum_info{GT} ne '.' );
     }
 
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
@@ -729,6 +576,98 @@ sub GetVariantClassification {
     # TFBS_ablation, TFBS_amplification,regulatory_region_ablation, regulatory_region_amplification,
     # feature_elongation, feature_truncation
     return "Targeted_Region";
+}
+
+# Fix the AD and DP fields, given data from a FORMATted genotype string
+sub FixAlleleDepths {
+    my ( $alleles_ref, $var_allele_idx, $fmt_info_ref ) = @_;
+    my %fmt_info = %{$fmt_info_ref};
+    my @alleles = @{$alleles_ref};
+    my @depths = ();
+
+    # If AD is defined, then parse out all REF/ALT allele depths, or whatever is in it
+    if( defined $fmt_info{AD} and $fmt_info{AD} ne "." ) {
+        @depths = map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AD} );
+    }
+
+    # Handle VarScan VCF lines where AD contains only 1 depth, and REF allele depth is in RD
+    if( scalar( @depths ) == 1 and defined $fmt_info{RD} ) {
+        @depths = map{""} @alleles;
+        $depths[0] = $fmt_info{RD};
+        $depths[$var_allele_idx] = $fmt_info{AD};
+    }
+    # Handle SomaticSniper VCF lines, where allele depths must be extracted from BCOUNT
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{BCOUNT} ) {
+        my %b_idx = ( A=>0, C=>1, G=>2, T=>3 );
+        my @bcount = split( /,/, $fmt_info{BCOUNT} );
+        @depths = map{(( defined $b_idx{$_} and defined $bcount[$b_idx{$_}] ) ? $bcount[$b_idx{$_}] : "" )} @alleles;
+    }
+    # Handle VCF SNV lines by Strelka, where allele depths are in AU:CU:GU:TU
+    elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/AU CU GU TU/ ) == 4 ) {
+        # Strelka allele depths come in tiers 1,2. We'll use tier1 cuz it's stricter, and DP already is
+        map{( $fmt_info{$_.'U'} ) = split( ",", $fmt_info{$_.'U'} )} qw( A C G T );
+
+        # If the only ALT allele is N, then set it to the allele with the highest non-ref readcount
+        if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
+            $var_allele_idx = 1;
+            my %acgt_depths = map{( defined $fmt_info{$_.'U'} ? ( $_, $fmt_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
+            my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
+            ( $alleles[$var_allele_idx] ) = ( $deepest[0] ne $alleles[0] ? $deepest[0] : $deepest[1] );
+        }
+        @depths = map{( defined $fmt_info{$_.'U'} ? $fmt_info{$_.'U'} : "" )} @alleles;
+    }
+    # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
+    elsif( !defined $fmt_info{AD} and $fmt_info{TIR} ) {
+        # Reference allele depth is not provided by Strelka for indels, so we have to skip it
+        @depths = ( "", ( split /,/, $fmt_info{TIR} )[0] );
+    }
+    # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{AO} and defined $fmt_info{RO} ) {
+        @depths = ( $fmt_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AO} ));
+    }
+    # Handle VCF lines with ALT allele fraction in FA, which needs to be multiplied by DP to get AD
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{FA} and defined $fmt_info{DP} and $fmt_info{DP} ne '.' ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[$var_allele_idx] = sprintf( "%.0f", $fmt_info{FA} * $fmt_info{DP} );
+    }
+    # Handle VCF lines from mpileup/bcftools where DV contains the ALT allele depth
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{DV} and defined $fmt_info{DP} ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[$var_allele_idx] = $fmt_info{DV};
+    }
+    # Handle VCF lines where AD contains only 1 value, that we can assume is the variant allele
+    elsif( defined $fmt_info{AD} and @depths and scalar( @depths ) == 1 ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[$var_allele_idx] = $fmt_info{AD};
+    }
+    # For all other lines where #depths is not equal to #alleles, blank out the depths
+    elsif( @depths and scalar( @depths ) ne scalar( @alleles )) {
+        @depths = map{""} @alleles;
+    }
+
+    # Sanity check that REF/ALT allele depths are lower than the total depth
+    if( defined $fmt_info{DP} and $fmt_info{DP} ne '.' and (( $depths[0] and $depths[0] > $fmt_info{DP} ) or
+        ( $depths[$var_allele_idx] and $depths[$var_allele_idx] > $fmt_info{DP} ) or
+        ( $depths[0] and $depths[$var_allele_idx] and $depths[0] + $depths[$var_allele_idx] > $fmt_info{DP} ))) {
+        $fmt_info{DP} = 0;
+        map{$fmt_info{DP} += $_ if($_ and $_ ne '.')} @depths;
+    }
+
+    # If we have REF/ALT allele depths, but no DP, then set DP equal to the sum of all ADs
+    if(( defined $depths[0] and defined $depths[$var_allele_idx] ) and ( !defined $fmt_info{DP} or $fmt_info{DP} eq '.' )) {
+        $fmt_info{DP} = 0;
+        map{$fmt_info{DP} += $_ if($_ and $_ ne '.')} @depths;
+    }
+
+    # Put all our changes back into the hash/array references that were passed over
+    $fmt_info{AD} = join( ",", map{( $_ ne "" ? $_ : "." )} @depths );
+    %{$fmt_info_ref} = %fmt_info;
+    @{$alleles_ref} = @alleles;
+
+    return 1;
 }
 
 __DATA__
