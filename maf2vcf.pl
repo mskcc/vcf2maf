@@ -80,6 +80,9 @@ while( my $line = $maf_fh->getline ) {
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
         my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
 
+        # Quit if one of the TN barcodes are missing, or they contain characters not allowed in Unix filenames
+        map{ ( !m/^\s*$|^#|\0|\// ) or die "ERROR: Invalid Tumor_Sample_Barcode in MAF: \"$_\"\n"} @tn_pair;
+
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
 
         # Create a T-N pairing TSV file, since it's lost in translation to multi-sample VCF
