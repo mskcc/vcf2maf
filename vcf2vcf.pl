@@ -15,9 +15,15 @@ my ( $vcf_tumor_id, $vcf_normal_id ) = ( "TUMOR", "NORMAL" );
 # Define the minimal INFO and FORMAT fields that we want to retain
 my @retain_info = qw( SOMATIC SS );
 my @retain_format = qw( GT DP AD );
-my %retain_field = ();
-map{ $retain_field{"INFO/$_"} = 1 } @retain_info;
-map{ $retain_field{"FORMAT/$_"} = 1 } @retain_format;
+
+# Define FILTER descriptors that we'll add if user specified the --add-filters option
+my ( $min_tum_depth, $min_nrm_depth ) = ( 14, 8 );
+my ( $min_tum_support, $max_nrm_support ) = ( 3, 2 );
+my %filter_tags = (
+    "LowTotalDepth" => "Less than $min_tum_depth total reads in tumor, or less than $min_nrm_depth reads in normal",
+    "LowTumorSupport" => "Less than $min_tum_support allele supporting read(s) in tumor",
+    "HighNormalSupport" => "More than $max_nrm_support allele supporting read(s) in the normal"
+);
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
@@ -25,7 +31,7 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 }
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
-my ( $man, $help ) = ( 0, 0 );
+my ( $man, $help, $add_filters ) = ( 0, 0, 0 );
 my ( $input_vcf, $output_vcf, $new_tumor_id, $new_normal_id );
 GetOptions(
     'help!' => \$help,
@@ -35,7 +41,8 @@ GetOptions(
     'vcf-tumor-id=s' => \$vcf_tumor_id,
     'vcf-normal-id=s' => \$vcf_normal_id,
     'new-tumor-id=s' => \$new_tumor_id,
-    'new-normal-id=s' => \$new_normal_id
+    'new-normal-id=s' => \$new_normal_id,
+    'add-filters!' => \$add_filters
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -48,14 +55,20 @@ $new_tumor_id = $vcf_tumor_id unless( $new_tumor_id );
 $new_normal_id = $vcf_normal_id unless( $new_normal_id );
 
 # Initialize the output VCF file with the mandatory first line of a VCF header
-my $vcf_out_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
+my $vcf_out_fh = *STDOUT; # Use STDOUT if an output VCF file was not defined
 $vcf_out_fh = IO::File->new( $output_vcf, ">" ) or die "ERROR: Couldn't open output VCF file: $output_vcf!\n" if( $output_vcf );
 $vcf_out_fh->print( "##fileformat=VCFv4.2\n" );
+
 # Also add today's date just cuz we can
 my $file_date = strftime( "%Y%m%d", localtime );
 $vcf_out_fh->print( "##fileDate=$file_date\n" );
 
-# Parse through each variant in the annotated VCF, and fixem
+# And add our custom FILTER tag descriptors, if --add-filters was specified
+if( $add_filters ) {
+    $vcf_out_fh->print( "##FILTER=<ID=$_,Description=\"" . $filter_tags{$_} . "\">\n" ) foreach ( sort keys %filter_tags );
+}
+
+# Parse through each variant in the annotated VCF, and fix 'em
 my $vcf_in_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF file: $input_vcf!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx, %vcf_header_lines );
 while( my $line = $vcf_in_fh->getline ) {
@@ -65,9 +78,11 @@ while( my $line = $vcf_in_fh->getline ) {
         # Retain only the minimal INFO amd FORMAT descriptor lines in the header
         if( $line =~ m/^##(INFO|FORMAT)=<ID=([^,]+)/ ) {
             my ( $type, $tag ) = ( $1, $2 );
-            $vcf_out_fh->print( $line ) if( $retain_field{"$type/$tag"} );
+            if(( $type eq "INFO" and grep( $tag, @retain_info )) or ( $type eq "FORMAT" and grep( $tag, @retain_format ))) {
+                $vcf_out_fh->print( $line );
+            }
         }
-        elsif( $line =~ m/^##FILTER/ ) {
+        elsif( $line =~ m/^##FILTER=<ID=([^,]+)/ and !defined $filter_tags{$1}) {
             $vcf_out_fh->print( $line );
         }
         next;
@@ -86,7 +101,7 @@ while( my $line = $vcf_in_fh->getline ) {
             ( defined $vcf_tumor_idx ) or warn "WARNING: No genotype column for $vcf_tumor_id in VCF!\n";
             ( defined $vcf_normal_idx ) or warn "WARNING: No genotype column for $vcf_normal_id in VCF!\n";
         }
-        $vcf_out_fh->print( join( "\t", qw( #CHROM POS ID REF ALT QUAL FILTER INFO FORMAT ), $new_tumor_id, $new_normal_id ), "\n" );
+        $vcf_out_fh->print( "#", join( "\t", qw( CHROM POS ID REF ALT QUAL FILTER INFO FORMAT ), $new_tumor_id, $new_normal_id ), "\n" );
         next;
     }
 
@@ -134,6 +149,21 @@ while( my $line = $vcf_in_fh->getline ) {
         # Standardize AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%nrm_info );
         $tum_info{GT} = "./." unless( defined $tum_info{GT} and $tum_info{GT} ne '.' );
+    }
+
+    # Add more filter tags to the FILTER field, if --add-filters was specified
+    if( $add_filters ) {
+        my %tags = ();
+        map{ $tags{$_} = 1 unless( $_ eq "PASS" or $_ eq "." )} split( ",", $filter );
+        $tags{LowTotalDepth} = 1 if(( $tum_info{DP} ne "." and $tum_info{DP} < $min_tum_depth ) or ( $nrm_info{DP} ne "." and $nrm_info{DP} < $min_nrm_depth ));
+        my @tum_depths = split( /,/, $tum_info{AD} );
+        my @nrm_depths = split( /,/, $nrm_info{AD} );
+        my $tum_alt_depth = $tum_depths[$var_allele_idx];
+        my $nrm_alt_depth = $nrm_depths[$var_allele_idx];
+        $tags{LowTumorSupport} = 1 if( $tum_alt_depth ne "." and $tum_alt_depth < $min_tum_support );
+        $tags{HighNormalSupport} = 1 if( $nrm_alt_depth ne "." and $nrm_alt_depth > $max_nrm_support );
+        my $tags_to_add = join( ",", sort keys %tags );
+        $filter = ( $tags_to_add ? $tags_to_add : $filter );
     }
 
     # Print a VCF file with minimal genotype fields for tumor and normal
@@ -256,12 +286,13 @@ __DATA__
  --vcf-normal-id  Matched normal ID used in VCF's genotype column [Default: NORMAL]
  --new-tumor-id   Tumor sample ID to use in the new VCF [Default: --vcf-tumor-id]
  --new-normal-id  Matched normal ID to use in the new VCF [Default: --vcf-normal-id]
+ --add-filters    Use this to add some extra tags under FILTER [Default: 0]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
 =head1 DESCRIPTION
 
-The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a minimalist VCF that includes only the important bits of data from the INFO and FORMAT fields.
+The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a VCF with only important fields in INFO and FORMAT, like GT:DP:AD. Specify the --add-filters option, which will use the allele depths and fractions to add more tags under FILTER.
 
 =head2 Relevant links:
 
