@@ -355,7 +355,7 @@ while( my $line = $vcf_fh->getline ) {
     }
 
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
-    my $start = my $stop = my $var_type = "";
+    my $start = my $stop = my $var_type = my $inframe = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
     # Remove any prefixed reference bps from all alleles, using "-" for simple indels
     while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
@@ -378,6 +378,7 @@ while( my $line = $vcf_fh->getline ) {
             ( $start, $stop ) = ( $pos, $pos + $ref_length - 1 );
             $var_type = "DEL";
         }
+        $inframe = ( abs( $ref_length - $var_length ) % 3 == 0 ? 1 : 0 );
     }
 
     my @all_effects; # A list of effects of this variant on all possible transcripts
@@ -491,7 +492,7 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{End_Position} = $stop;
     $maf_line{Strand} = '+'; # Per MAF definition, only the positive strand is an accepted value
     my $so_effect = ( $maf_effect->{Effect} ? $maf_effect->{Effect} : $maf_effect->{Consequence} );
-    $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type);
+    $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type, $inframe );
     $maf_line{Variant_Type} = $var_type;
     $maf_line{Reference_Allele} = $ref;
     # ::NOTE:: If tumor genotype is unavailable, then we'll assume it's ref/var heterozygous
@@ -553,19 +554,19 @@ $vcf_fh->close;
 
 # Converts Sequence Ontology variant types to MAF variant classifications
 sub GetVariantClassification {
-    my ( $effect, $var_type ) = @_;
-    return "Splice_Site" if( $effect =~ /^(splice_acceptor_variant|splice_donor_variant|transcript_ablation)$/ );
+    my ( $effect, $var_type, $inframe ) = @_;
+    return "Splice_Site" if( $effect =~ /^(splice_acceptor_variant|splice_donor_variant|transcript_ablation|exon_loss_variant)$/ );
     return "Nonsense_Mutation" if( $effect eq 'stop_gained' );
-    return "Frame_Shift_Del" if ( $effect eq 'frameshift_variant' and $var_type eq 'DEL' );
-    return "Frame_Shift_Ins" if( $effect eq 'frameshift_variant' and $var_type eq 'INS' );
+    return "Frame_Shift_Del" if(( $effect eq 'frameshift_variant' or ( $effect eq 'protein_altering_variant' and !$inframe )) and $var_type eq 'DEL' );
+    return "Frame_Shift_Ins" if(( $effect eq 'frameshift_variant' or ( $effect eq 'protein_altering_variant' and !$inframe )) and $var_type eq 'INS' );
     return "Nonstop_Mutation" if( $effect eq 'stop_lost' );
     return "Translation_Start_Site" if( $effect =~ /^(initiator_codon_variant|start_lost)$/ );
-    return "In_Frame_Ins" if( $effect eq 'inframe_insertion' );
-    return "In_Frame_Del" if( $effect eq 'inframe_deletion' );
+    return "In_Frame_Ins" if( $effect =~ /^(inframe_insertion|disruptive_inframe_insertion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'INS' ));
+    return "In_Frame_Del" if( $effect =~ /^(inframe_deletion|disruptive_inframe_deletion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'DEL' ));
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
     return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC|intragenic_variant)$/ );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
-    return "RNA" if( $effect =~ /^(mature_miRNA_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
+    return "RNA" if( $effect =~ /^(mature_miRNA_variant|exon_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
     return "3'UTR" if( $effect eq '3_prime_UTR_variant' );
     return "IGR" if( $effect =~ /^(TF_binding_site_variant|regulatory_region_variant|regulatory_region|intergenic_variant|intergenic_region)$/ );
