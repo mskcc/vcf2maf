@@ -67,7 +67,7 @@ while( my $line = $maf_fh->getline ) {
     my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
 
     # Parse the header line to map column names to their indexes
-    if( $line =~ m/^(Hugo_Symbol|Chromosome)/ ) {
+    if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/ ) {
         my $idx = 0;
 
         # Fetch the column names and do some sanity checks (don't be case-sensitive)
@@ -78,7 +78,7 @@ while( my $line = $maf_fh->getline ) {
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
         my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
-        my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome" $input_maf | cut -f $tn_idx | sort -u`;
+        my @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
 
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
 
@@ -97,8 +97,8 @@ while( my $line = $maf_fh->getline ) {
                 my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
                 $tn_vcf{$vcf_file} .= "##fileformat=VCFv4.2\n";
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
-                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n";
-                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic depths of REF and ALT(s) in the order listed\">\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth across this site\">\n";
                 $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
             }
             
@@ -112,7 +112,7 @@ while( my $line = $maf_fh->getline ) {
     }
 
     # Print an error if we got to this point without parsing a header line
-    ( %col_idx ) or die "ERROR: Couldn't find a header line in the MAF: $input_maf\n";
+    ( %col_idx ) or die "ERROR: Couldn't find a header line (starts with Hugo_Symbol, Chromosome, or Tumor_Sample_Barcode) in the MAF: $input_maf\n";
     $line_count++; # Increment a counter for all non-header lines, to help with debugging
 
     # For each variant in the MAF, parse out data that can go into the output VCF
@@ -135,33 +135,36 @@ while( my $line = $maf_fh->getline ) {
     $n_al1 = $ref if( $n_al1 eq "" );
     $n_al2 = $ref if( $n_al2 eq "" );
 
-    # Make sure we have at least 1 variant allele. If 1 is unset, set it to the reference allele
+    # Make sure we have at least one variant allele. If not, die with an error
     if( $al1 eq "" and $al2 eq "" ) {
-        warn "WARNING: Skipping variant at $chr:$pos without any variant alleles specified!\n";
-        next;
+        die "ERROR: MAF like $line_count has no variant allele specified at $chr:$pos!\n";
     }
+    # If one of the variant alleles is unset, assume that it's the same as the reference allele
     $al1 = $ref if( $al1 eq "" );
     $al2 = $ref if( $al2 eq "" );
 
     # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
 
-    # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
-    my ( $ref_len, $al1_len, $al2_len ) = map{( $_=~m/^(\?|-|0)+$/ ? 0 : length( $_ )) } ( $ref, $al1, $al2 );
-    if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 ) {
-        --$pos if( $ref_len > $al1_len or $ref_len > $al2_len ); # Decrement POS for deletions only
-        my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
-        chomp( $prefix_bp );
-        $prefix_bp = uc( $prefix_bp );
-        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please check that you chose the correct reference genome with --ref-fasta:\n$ref_fasta\n";
-        # Blank out the dashes (or other weird chars) used with indels, and prefix the fetched bp
-        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_=$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
-    }
+    # Blank out the dashes (or other weird chars) used with indels
+    ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
 
-    # To simplify setting tumor genotype later, ensure that $al2 is always non-REF
+    # To simplify code coming up below, ensure that $al2 is always non-REF
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq $ref );
     # Do the same for the normal alleles, though it makes no difference if both are REF
     ( $n_al1, $n_al2 ) = ( $n_al2, $n_al1 ) if( $n_al2 eq $ref );
+
+    # To represent indels in VCF format, we need to fetch the preceding bp from a reference FASTA
+    my ( $ref_len, $al1_len, $al2_len ) = map{ length( $_ ) } ( $ref, $al1, $al2 );
+    if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 or ( $ref_len ne $al2_len and substr( $ref, 0, 1 ) ne substr( $al2, 0, 1 ))) {
+        --$pos unless( $ref eq "" ); # Decrement POS unless this is a MAF-format simple insertion
+        my $prefix_bp = `$samtools faidx $ref_fasta $chr:$pos-$pos | grep -v ^\\>`;
+        chomp( $prefix_bp );
+        $prefix_bp = uc( $prefix_bp );
+        ( $prefix_bp =~ m/^[ACGTN]$/ ) or die "ERROR: Cannot retreive bp at $chr:$pos! Please check that you chose the correct reference genome with --ref-fasta: $ref_fasta\n";
+        # Prefix the fetched reference bp to all the alleles
+        ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
+    }
 
     # Fill an array with all unique REF/ALT alleles, and set their 0-based indexes like in a VCF
     # Notice how we ensure that $alleles[0] is REF and $alleles[1] is the major ALT allele in tumor

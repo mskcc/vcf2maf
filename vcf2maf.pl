@@ -371,7 +371,7 @@ while( my $line = $vcf_fh->getline ) {
     # Handle all indels, including those complex ones which contain substitutions
     elsif( $ref_length != $var_length ) {
         if( $ref_length < $var_length ) { # Handle insertions, and the special case for complex ones
-            ( $start, $stop ) = ( $pos - 1, ( $ref eq "-" ? $pos : $pos + $ref_length - 1 ));
+            ( $start, $stop ) = (( $ref eq "-" ? $pos - 1 : $pos ), ( $ref eq "-" ? $pos : $pos + $ref_length - 1 ));
             $var_type = "INS";
         }
         else { # Handle deletions
