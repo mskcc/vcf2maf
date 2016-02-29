@@ -77,11 +77,11 @@ Create temporary shell variables pointing to where we'll store VEP and its cache
     export VEP_PATH=~/vep
     export VEP_DATA=~/.vep
 
-Download the v82 release of VEP:
+Download the v83 release of VEP:
 
     mkdir $VEP_PATH $VEP_DATA; cd $VEP_PATH
-    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/82.tar.gz
-    tar -zxf 82.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
+    curl -LO https://github.com/Ensembl/ensembl-tools/archive/release/83.tar.gz
+    tar -zxf 83.tar.gz --starting-file variant_effect_predictor --transform='s|.*/|./|g'
 
 Add that path to `PERL5LIB`, and the htslib subfolder to `PATH` where `tabix` will be installed:
 
@@ -90,18 +90,19 @@ Add that path to `PERL5LIB`, and the htslib subfolder to `PATH` where `tabix` wi
 
 Download and unpack VEP's offline cache for GRCh37, GRCh38, and GRCm38:
 
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-82/variation/VEP/homo_sapiens_vep_82_GRCh{37,38}.tar.gz $VEP_DATA
-    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-82/variation/VEP/mus_musculus_vep_82_GRCm38.tar.gz $VEP_DATA
-    cat $VEP_DATA/*_vep_82_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-83/variation/VEP/homo_sapiens_vep_83_GRCh{37,38}.tar.gz $VEP_DATA
+    rsync -zvh rsync://ftp.ensembl.org/ensembl/pub/release-83/variation/VEP/mus_musculus_vep_83_GRCm38.tar.gz $VEP_DATA
+    cat $VEP_DATA/*_vep_83_GRC{h37,h38,m38}.tar.gz | tar -izxf - -C $VEP_DATA
 
 Install the Ensembl API, the reference FASTAs for GRCh37/GRCh38/GRCm38, and some neat VEP plugins:
 
-    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens,mus_musculus --ASSEMBLY GRCh38,GRCm38 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
     perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh37 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES homo_sapiens --ASSEMBLY GRCh38 --PLUGINS CADD,ExAC,dbNSFP,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+    perl INSTALL.pl --AUTO afp --SPECIES mus_musculus --ASSEMBLY GRCm38 --PLUGINS CADD,UpDownDistance --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
 
 Convert the offline cache for use with tabix, that significantly speeds up the lookup of known variants:
 
-    perl convert_cache.pl --species homo_sapiens,mus_musculus --version 82_GRCh37,82_GRCh38,82_GRCm38 --dir $VEP_DATA
+    perl convert_cache.pl --species homo_sapiens,mus_musculus --version 83_GRCh37,83_GRCh38,83_GRCm38 --dir $VEP_DATA
 
 Download and index a custom ExAC r0.3 VCF, that skips variants overlapping known somatic hotspots:
 
@@ -110,7 +111,7 @@ Download and index a custom ExAC r0.3 VCF, that skips variants overlapping known
 
 Test running VEP in offline mode with the ExAC plugin, on the provided sample GRCh37 VCF:
 
-    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.minus_somatic.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
+    perl variant_effect_predictor.pl --species homo_sapiens --assembly GRCh37 --offline --no_progress --everything --shift_hgvs 1 --check_existing --check_alleles --total_length --allele_number --no_escape --xref_refseq --dir $VEP_DATA --fasta $VEP_DATA/homo_sapiens/83_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz --plugin ExAC,$VEP_DATA/ExAC.r0.3.sites.minus_somatic.vcf.gz --input_file example_GRCh37.vcf --output_file example_GRCh37.vep.txt
 
 Authors
 -------

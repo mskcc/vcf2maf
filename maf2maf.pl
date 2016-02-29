@@ -16,8 +16,8 @@ use Config;
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4,
-    "$ENV{HOME}/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
-my ( $species, $ncbi_build, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", ".", 0.7 );
+    "$ENV{HOME}/.vep/homo_sapiens/83_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
@@ -68,6 +68,7 @@ GetOptions(
     'vep-forks=s' => \$vep_forks,
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
+    'cache-version=s' => \$cache_version,
     'ref-fasta=s' => \$ref_fasta,
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
@@ -111,10 +112,15 @@ else {
     ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
     
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --regulatory --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $vcf_file --output_file $vep_anno";
-    $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 ); # VEP barks if it's set to 1
+    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $vcf_file --output_file $vep_anno";
+    # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
+    $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
+    # Add --cache-version only if the user specifically asked for a version
+    $vep_cmd .= " --cache_version $cache_version" if( $cache_version );
     # Add options that only work on human variants
     $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
+    # Add options that work for most species, except a few
+    $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
     # Add options that only work on human variants mapped to the GRCh37 reference genome
     $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.minus_somatic.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
 
@@ -351,7 +357,8 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/82_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 83) [Default: Installed version]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/83_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
