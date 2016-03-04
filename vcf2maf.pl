@@ -329,6 +329,7 @@ while( my $line = $vcf_fh->getline ) {
 
         # Standardize AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%tum_info );
+        @tum_depths = split( ",", $tum_info{AD} );
 
         # If genotype is undefined, use the allele depths collected to choose the major variant allele
         unless( defined $tum_info{GT} and $tum_info{GT} ne '.' and $tum_info{GT} ne "./." ) {
@@ -356,7 +357,8 @@ while( my $line = $vcf_fh->getline ) {
 
         # Standardize AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%nrm_info );
-        $tum_info{GT} = "./." unless( defined $tum_info{GT} and $tum_info{GT} ne '.' );
+        @nrm_depths = split( ",", $nrm_info{AD} );
+        $nrm_info{GT} = "./." unless( defined $nrm_info{GT} and $nrm_info{GT} ne '.' );
     }
 
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
