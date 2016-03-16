@@ -148,7 +148,7 @@ while( my $line = $vcf_in_fh->getline ) {
 
         # Standardize AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%nrm_info );
-        $tum_info{GT} = "./." unless( defined $tum_info{GT} and $tum_info{GT} ne '.' );
+        $nrm_info{GT} = "./." unless( defined $nrm_info{GT} and $nrm_info{GT} ne '.' );
     }
 
     # Add more filter tags to the FILTER field, if --add-filters was specified
