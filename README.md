@@ -1,6 +1,4 @@
-![Data Yes!](https://d3q28pkxsyrk9d.cloudfront.net/record_attachments/1584684/image_rec_big/princessxsofia-1584684.gif)
-
-vcf2maf
+vcf<img src="https://d3q28pkxsyrk9d.cloudfront.net/record_attachments/1584684/image_rec_big/princessxsofia-1584684.gif" width="35">maf
 =======
 
 [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.14107.svg)](http://dx.doi.org/10.5281/zenodo.14107)
