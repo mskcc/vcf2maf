@@ -101,6 +101,7 @@ sub GetBiotypePriority {
         'snRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'snoRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'ribozyme' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
+        'tRNA' => 3, #Added by Y. Boursin
         'sRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'scaRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'rRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
@@ -112,6 +113,7 @@ sub GetBiotypePriority {
         'Mt_tRNA' => 4, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'Mt_rRNA' => 4, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'antisense' => 5, # Has transcripts that overlap the genomic span (i.e. exon or introns) of a protein-coding locus on the opposite strand
+        'antisense_RNA' => 5, # Alias for antisense (Y. Boursin)
         'sense_intronic' => 5, # Long non-coding transcript in introns of a coding gene that does not overlap any exons
         'sense_overlapping' => 5, # Long non-coding transcript that contains a coding gene in its intron on the same strand
         '3prime_overlapping_ncrna' => 5, # Transcripts where ditag and/or published experimental data strongly supports the existence of short non-coding transcripts transcribed from the 3'UTR
