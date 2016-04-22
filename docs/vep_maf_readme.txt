@@ -46,7 +46,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 65. CANONICAL - a flag indicating if the transcript is denoted as the canonical transcript for this gene
 66. CCDS - the CCDS identifer for this transcript, where applicable
 67. ENSP - the Ensembl protein identifier of the affected transcript
-68. SWISSPROT - UniProtKB/Swiss-Prot identifier of protein product
+68. SWISSPROT - UniProtKB/Swiss-Prot accession
 69. TREMBL - UniProtKB/TrEMBL identifier of protein product
 70. UNIPARC - UniParc identifier of protein product
 71. RefSeq - RefSeq identifier for this transcript
