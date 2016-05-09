@@ -11,7 +11,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/83_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/84_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
@@ -42,9 +42,9 @@ sub GetEffectPriority {
         'conservative_missense_variant' => 6, # A sequence variant whereby at least one base of a codon is changed resulting in a codon that encodes for a different but similar amino acid. These variants may or may not be deleterious
         'rare_amino_acid_variant' => 6, # A sequence variant whereby at least one base of a codon encoding a rare amino acid is changed, resulting in a different encoded amino acid
         'transcript_amplification' => 7, # A feature amplification of a region containing a transcript
-        'stop_retained_variant' => 8, # A sequence variant where at least one base in the terminator codon is changed, but the terminator remains
-        'synonymous_variant' => 8, # A sequence variant where there is no resulting change to the encoded amino acid
-        'splice_region_variant' => 9, # A sequence variant in which a change has occurred within the region of the splice site, either within 1-3 bases of the exon or 3-8 bases of the intron
+        'splice_region_variant' => 8, # A sequence variant in which a change has occurred within the region of the splice site, either within 1-3 bases of the exon or 3-8 bases of the intron
+        'stop_retained_variant' => 9, # A sequence variant where at least one base in the terminator codon is changed, but the terminator remains
+        'synonymous_variant' => 9, # A sequence variant where there is no resulting change to the encoded amino acid
         'incomplete_terminal_codon_variant' => 10, # A sequence variant where at least one base of the final codon of an incompletely annotated transcript is changed
         'protein_altering_variant' => 11, # A sequence variant which is predicted to change the protein encoded in the coding sequence
         'coding_sequence_variant' => 11, # A sequence variant that changes the coding sequence
@@ -76,7 +76,10 @@ sub GetEffectPriority {
         'intergenic_region' => 19, # snpEff-specific effect that should really be intergenic_variant
         '' => 20
     );
-    $effectPriority{$effect} or die "ERROR: Unrecognized effect \"$effect\". Please update your hashes!\n";
+    unless( defined $effectPriority{$effect} ) {
+        warn "WARNING: Unrecognized effect \"$effect\". Assigning lowest priority!\n";
+        return 20;
+    }
     return $effectPriority{$effect};
 }
 
@@ -159,9 +162,12 @@ sub GetBiotypePriority {
         'TR_J_pseudogene' => 8, # Inactivated immunoglobulin gene
         'TR_V_pseudogene' => 8, # Inactivated immunoglobulin gene
         'artifact' => 9, # Used to tag mistakes in the public databases (Ensembl/SwissProt/Trembl)
-        '' => 9
+        '' => 10
     );
-    $biotype_priority{$biotype} or die "ERROR: Unrecognized biotype \"$biotype\". Please update your hashes!\n";
+    unless( defined $biotype_priority{$biotype} ) {
+        warn "WARNING: Unrecognized biotype \"$biotype\". Assigning lowest priority!\n";
+        return 10;
+    }
     return $biotype_priority{$biotype};
 }
 
@@ -493,6 +499,7 @@ while( my $line = $vcf_fh->getline ) {
     # Construct the MAF columns from the $maf_effect hash, and print to output
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
     $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
+    $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Transcript_ID} );
     $maf_line{Entrez_Gene_Id} = '0';
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
@@ -547,7 +554,7 @@ while( my $line = $vcf_fh->getline ) {
     # Apply FILTER from the input VCF, and also tag calls with high minor allele frequency in
     # any ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
     my ( $max_subpop_maf, $subpop_count ) = ( 0.0004, 0 );
-    foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS )) {
+    foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_SAS )) {
         $subpop_count++ if( $maf_line{$subpop} ne "" and $maf_line{$subpop} > $max_subpop_maf );
     }
     if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic|risk_factor|protective/ ) {
@@ -573,7 +580,8 @@ sub GetVariantClassification {
     return "In_Frame_Ins" if( $effect =~ /^(inframe_insertion|disruptive_inframe_insertion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'INS' ));
     return "In_Frame_Del" if( $effect =~ /^(inframe_deletion|disruptive_inframe_deletion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'DEL' ));
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
-    return "Intron" if ( $effect =~ /^(transcript_amplification|splice_region_variant|intron_variant|INTRAGENIC|intragenic_variant)$/ );
+    return "Intron" if ( $effect =~ /^(transcript_amplification|intron_variant|INTRAGENIC|intragenic_variant)$/ );
+    return "Splice_Region" if( $effect eq 'splice_region_variant$' );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|exon_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
@@ -703,10 +711,10 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/83_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/84_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 83) [Default: Installed version]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 84) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --help           Print a brief help message and quit
