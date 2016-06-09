@@ -445,7 +445,7 @@ while( my $line = $vcf_fh->getline ) {
             }
 
             # Fix HGVSp_Short for Silent mutations, so it mentions the amino-acid and position
-            if( $effect{Consequence} eq "synonymous_variant" ) {
+            if( defined $effect{HGVSp_Short} and $effect{HGVSp_Short} eq "p.=" ) {
                 my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)(-\d+)?\/\d+$/;
                 my $aa = $effect{Amino_acids};
                 $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
@@ -581,7 +581,7 @@ sub GetVariantClassification {
     return "In_Frame_Del" if( $effect =~ /^(inframe_deletion|disruptive_inframe_deletion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'DEL' ));
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
     return "Intron" if ( $effect =~ /^(transcript_amplification|intron_variant|INTRAGENIC|intragenic_variant)$/ );
-    return "Splice_Region" if( $effect eq 'splice_region_variant$' );
+    return "Splice_Region" if( $effect eq 'splice_region_variant' );
     return "Silent" if( $effect =~ /^(incomplete_terminal_codon_variant|synonymous_variant|stop_retained_variant|NMD_transcript_variant)$/ );
     return "RNA" if( $effect =~ /^(mature_miRNA_variant|exon_variant|non_coding_exon_variant|non_coding_transcript_exon_variant|non_coding_transcript_variant|nc_transcript_variant)$/ );
     return "5'UTR" if( $effect =~ /^(5_prime_UTR_variant|5_prime_UTR_premature_start_codon_gain_variant)$/ );
