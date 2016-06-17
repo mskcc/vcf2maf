@@ -563,7 +563,7 @@ while( my $line = $vcf_fh->getline ) {
     $maf_line{FILTER} = $filter;
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
-    $maf_fh->print( join( "\t", map{ $maf_line{$_} } @maf_header ) . "\n" );
+    $maf_fh->print( join( "\t", map{( defined $maf_line{$_} ? $maf_line{$_} : "" )} @maf_header ) . "\n" );
 }
 $maf_fh->close if( $output_maf );
 $vcf_fh->close;
