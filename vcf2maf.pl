@@ -286,7 +286,8 @@ while( my $line = $vcf_fh->getline ) {
 
     # Parse out the VEP CSQ/ANN format, which seems to differ between runs
     if( $line =~ m/^##INFO=<ID=(CSQ|ANN).*Format: (\S+)">$/ ) {
-        @ann_cols_format = split( /\|/, $2 );
+        # Use this as the expected column order of VEP annotation, unless we already got it from CSQ
+        @ann_cols_format = split( /\|/, $2 ) unless( @ann_cols_format and $1 eq "ANN" );
     }
     # Skip all other header lines
     next if( $line =~ m/^##/ );
