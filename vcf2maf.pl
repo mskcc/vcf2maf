@@ -274,7 +274,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
-# Parse through each variant in the annotated VCF, pull out ANN/CSQ from the INFO column, and choose
+# Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
@@ -284,8 +284,8 @@ my $vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $vcf_fh->getline ) {
 
-    # Parse out the VEP ANN/CSQ format, which seems to differ between runs
-    if( $line =~ m/^##INFO=<ID=(ANN|CSQ).*Format: (\S+)">$/ ) {
+    # Parse out the VEP CSQ/ANN format, which seems to differ between runs
+    if( $line =~ m/^##INFO=<ID=(CSQ|ANN).*Format: (\S+)">$/ ) {
         @ann_cols_format = split( /\|/, $2 );
     }
     # Skip all other header lines
@@ -403,9 +403,9 @@ while( my $line = $vcf_fh->getline ) {
     # VEP provides a comma-delimited list of consequences, with pipe-delim details per consequence
     # It replaces ',' in details with '&'. We'll assume that all '&'s we see, were formerly commas
     # "Consequence" might list multiple effects on the same transcript e.g. missense,splice_region
-    if( $info{ANN} or $info{CSQ} ) {
+    if( $info{CSQ} or $info{ANN} ) {
 
-        my $ann_lines = ( $info{ANN} ? $info{ANN} : $info{CSQ} );
+        my $ann_lines = ( $info{CSQ} ? $info{CSQ} : $info{ANN} );
         foreach my $ann_line ( split( /,/, $ann_lines )) {
             my $idx = 0;
             my %effect = map{s/\&/,/g; ( $ann_cols_format[$idx++], ( defined $_ ? $_ : '' ))} split( /\|/, $ann_line );
