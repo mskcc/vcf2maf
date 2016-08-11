@@ -61,7 +61,7 @@ WORKDIR /opt/variant_effect_predictor_85/cache/Plugins
 RUN wget https://raw.githubusercontent.com/konradjk/loftee/master/splice_module.pl
 
 WORKDIR /opt
-ADD . /opt 
+ADD . /opt/vcf2maf 
 
 COPY Dockerfile /opt/
 MAINTAINER Michele Mattioni, Seven Bridges, <michele.mattioni@sbgenomics.com>
