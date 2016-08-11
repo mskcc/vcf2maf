@@ -61,9 +61,7 @@ WORKDIR /opt/variant_effect_predictor_85/cache/Plugins
 RUN wget https://raw.githubusercontent.com/konradjk/loftee/master/splice_module.pl
 
 WORKDIR /opt
-RUN curl -LO https://github.com/mskcc/vcf2maf/archive/master.zip
-RUN unzip master.zip
-RUN rm master.zip
+ADD . /opt 
 
 COPY Dockerfile /opt/
-MAINTAINER Bogdan Gavrilovic, Seven Bridges Genomics, <bogdan.gavrilovic@sbgenomics.com>
+MAINTAINER Michele Mattioni, Seven Bridges, <michele.mattioni@sbgenomics.com>
