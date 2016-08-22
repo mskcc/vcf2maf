@@ -15,6 +15,12 @@ my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{
 my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
+# Find out where samtools is installed, and warn the user if it's not
+my $samtools = ( -e "/opt/bin/samtools" ? "/opt/bin/samtools" : "/usr/bin/samtools" );
+$samtools = `which samtools` unless( -e $samtools );
+chomp( $samtools );
+( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
+
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
     Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Xxx X Ter * );
@@ -209,46 +215,82 @@ $vcf_normal_id = $normal_id unless( $vcf_normal_id );
 # Load up the custom isoform overrides if provided:
 my %custom_enst;
 if( $custom_enst_file ) {
-	( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty!\nPath: $custom_enst_file\n";
+    ( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty!\nPath: $custom_enst_file\n";
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
-# Annotate variants in given VCF to all possible transcripts
-my $output_vcf;
-if( $input_vcf ) {
-    ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
-    ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+# Before running annotation, let's pull flanking bps for each variant and do some checks
+warn "STATUS: Pulling flanking base pairs around each variant and running some checks\n";
+( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
+( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
+my ( %ref_bps, @ref_loci, $regions );
+while( my $line = $vcf_fh->getline ) {
+    # Skip header lines, and pull variant loci to pass to samtools later
+    next if( $line =~ m/^#/ );
+    chomp( $line );
+    my ( $chr, $pos, undef, $ref ) = split( /\t/, $line );
+    $ref_bps{"$chr:$pos"} = $ref;
+    push( @ref_loci, "$chr:$pos" );
+    $regions .= " $chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
+}
+$vcf_fh->close;
 
-    $output_vcf = $input_vcf;
-    $output_vcf =~ s/(\.vcf)*$/.vep.vcf/;
-
-    # Skip running VEP if an annotated VCF already exists
-    unless( -s $output_vcf ) {
-        warn "STATUS: Running VEP and writing to: $output_vcf\n";
-        # Make sure we can find the VEP script and the reference FASTA
-        ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
-        ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
-
-        # Contruct VEP command using some default options and run it
-        my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $input_vcf --output_file $output_vcf";
-        # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
-        $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
-        # Add --cache-version only if the user specifically asked for a version
-        $vep_cmd .= " --cache_version $cache_version" if( $cache_version );
-        # Add options that only work on human variants
-        $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
-        # Add options that work for most species, except a few we know about
-        $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
-        # Add options that only work on human variants mapped to the GRCh37 reference genome
-        $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.minus_somatic.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
-
-        # Make sure it ran without error codes
-        system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-        ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
+my %flanking_bps;
+# samtools runs faster when passed many loci at a time, but has an arg limit of `getconf ARG_MAX`
+foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $regions` ))) {
+    my ( $locus, $bps ) = split( "\n", $line );
+    if( $bps ){
+        $bps = uc( $bps );
+        # Restore the original chrom and position from the input VCF
+        ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $locus );
+        $flanking_bps{$locus} = $bps;
     }
 }
-else {
-    die "ERROR: Please specify an input file: input-vcf. STDIN is not supported.\n";
+
+# For each variant locus and reference allele in the input VCF, report any problems
+foreach my $ref_locus ( @ref_loci ) {
+    my $ref = $ref_bps{$ref_locus};
+    my ( $chr, $pos ) = split( ":", $ref_locus );
+    if( !defined $flanking_bps{$ref_locus} ) {
+        warn "WARNING: Couldn't Retrieve bps around $ref_locus from reference FASTA: $ref_fasta\n";
+    }
+    elsif( $flanking_bps{$ref_locus} !~ m/^[ACGTN]+$/ ) {
+        warn "WARNING: Retrieved invalid bps " . $flanking_bps{$ref_locus} . " around $ref_locus from reference FASTA: $ref_fasta\n";
+    }
+    elsif( $ref ne substr( $flanking_bps{$ref_locus}, 1, length( $ref ))) {
+        warn "WARNING: Reference allele $ref at $ref_locus doesn't match " .
+            substr( $flanking_bps{$ref_locus}, 1, length( $ref )) . " (flanking bps: " .
+            $flanking_bps{$ref_locus} . ") from reference FASTA: $ref_fasta\n";
+    }
+}
+
+# Annotate variants in given VCF to all possible transcripts
+my $output_vcf = $input_vcf;
+$output_vcf =~ s/(\.vcf)*$/.vep.vcf/;
+# Skip running VEP if an annotated VCF already exists
+unless( -s $output_vcf ) {
+    warn "STATUS: Running VEP and writing to: $output_vcf\n";
+    # Make sure we can find the VEP script and the reference FASTA
+    ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
+    ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
+
+    # Contruct VEP command using some default options and run it
+    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --check_alleles --check_ref --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --input_file $input_vcf --output_file $output_vcf";
+    # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
+    $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
+    # Add --cache-version only if the user specifically asked for a version
+    $vep_cmd .= " --cache_version $cache_version" if( $cache_version );
+    # Add options that only work on human variants
+    $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
+    # Add options that work for most species, except a few we know about
+    $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
+    # Add options that only work on human variants mapped to the GRCh37 reference genome
+    $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.minus_somatic.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
+
+    # Make sure it ran without error codes
+    system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
+    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -270,7 +312,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps );
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -280,9 +322,9 @@ my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
 ( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
+my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
-while( my $line = $vcf_fh->getline ) {
+while( my $line = $annotated_vcf_fh->getline ) {
 
     # Parse out the VEP CSQ/ANN format, which seems to differ between runs
     if( $line =~ m/^##INFO=<ID=(CSQ|ANN).*Format: (\S+)">$/ ) {
@@ -374,6 +416,7 @@ while( my $line = $vcf_fh->getline ) {
     my $start = my $stop = my $var_type = my $inframe = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
     # Remove any prefixed reference bps from all alleles, using "-" for simple indels
+    my $vcf_pos = $pos;
     while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
         ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
         --$ref_length; --$var_length; ++$pos;
@@ -563,11 +606,14 @@ while( my $line = $vcf_fh->getline ) {
     }
     $maf_line{FILTER} = $filter;
 
+    # Also add the reference allele flanking bps that we generated earlier with samtools
+    $maf_line{flanking_bps} = $flanking_bps{"$chrom:$vcf_pos"};
+
     # At this point, we've generated all we can about this variant, so write it to the MAF
     $maf_fh->print( join( "\t", map{( defined $maf_line{$_} ? $maf_line{$_} : "" )} @maf_header ) . "\n" );
 }
 $maf_fh->close if( $output_maf );
-$vcf_fh->close;
+$annotated_vcf_fh->close;
 
 # Converts Sequence Ontology variant types to MAF variant classifications
 sub GetVariantClassification {
