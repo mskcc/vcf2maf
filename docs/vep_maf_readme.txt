@@ -41,7 +41,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 57. Existing_variation - known identifier of existing variation
 58. ALLELE_NUM - allele number from input; 0 is reference, 1 is first alternate etc
 59. DISTANCE - shortest distance from variant to transcript
-60. STRAND - the DNA strand (1 or -1) on which the transcript/feature lies
+60. STRAND_VEP - the DNA strand (1 or -1) on which the transcript/feature lies
 61. SYMBOL - the gene symbol
 62. SYMBOL_SOURCE - the source of the gene symbol
 63. HGNC_ID - gene identifier from the HUGO Gene Nomenclature Committee

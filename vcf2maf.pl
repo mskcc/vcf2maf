@@ -307,7 +307,7 @@ my @maf_header = qw(
 
 # Add extra annotation columns to the MAF in a consistent order
 my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CDS_position
-    Protein_position Amino_acids Codons Existing_variation ALLELE_NUM DISTANCE STRAND SYMBOL
+    Protein_position Amino_acids Codons Existing_variation ALLELE_NUM DISTANCE STRAND_VEP SYMBOL
     SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
@@ -551,6 +551,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{Start_Position} = $start;
     $maf_line{End_Position} = $stop;
     $maf_line{Strand} = '+'; # Per MAF definition, only the positive strand is an accepted value
+    $maf_line{STRAND_VEP} = $maf_effect->{STRAND}; # Renamed to avoid mixup with "Strand" above
     my $so_effect = ( $maf_effect->{Effect} ? $maf_effect->{Effect} : $maf_effect->{Consequence} );
     $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type, $inframe );
     $maf_line{Variant_Type} = $var_type;
