@@ -220,7 +220,6 @@ if( $custom_enst_file ) {
 }
 
 # Before running annotation, let's pull flanking bps for each variant and do some checks
-warn "STATUS: Pulling flanking base pairs around each variant and running some checks\n";
 ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
@@ -466,10 +465,10 @@ while( my $line = $annotated_vcf_fh->getline ) {
             $effect{HGVSp} =~ s/^.*\((p\.\S+)\)/$1/ if( $effect{HGVSp} and $effect{HGVSp} =~ m/^c\./ );
 
             # If there are several consequences listed for a transcript, choose the most severe one
-            ( $effect{Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( /,/, $effect{Consequence} );
+            ( $effect{One_Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( ",", $effect{Consequence} );
 
             # When VEP fails to provide any value in Consequence, tag it as an intergenic variant
-            $effect{Consequence} = "intergenic_variant" unless( $effect{Consequence} );
+            $effect{One_Consequence} = "intergenic_variant" unless( $effect{Consequence} );
 
             # Create a shorter HGVS protein format using 1-letter codes
             if( $effect{HGVSp} ) {
@@ -481,7 +480,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             }
 
             # Fix HGVSp_Short, CDS_position, and Protein_position for splice acceptor/donor variants
-            if( $effect{Consequence} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
+            if( $effect{One_Consequence} =~ m/^(splice_acceptor_variant|splice_donor_variant)$/ ) {
                 my ( $c_pos ) = $effect{HGVSc} =~ m/^c.(\d+)/;
                 if( defined $c_pos ) {
                     $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
@@ -523,7 +522,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         # Sort effects first by transcript biotype, then by severity, and then by longest transcript
         @all_effects = sort {
             GetBiotypePriority( $a->{BIOTYPE} ) <=> GetBiotypePriority( $b->{BIOTYPE} ) ||
-            GetEffectPriority( $a->{Consequence} ) <=> GetEffectPriority( $b->{Consequence} ) ||
+            GetEffectPriority( $a->{One_Consequence} ) <=> GetEffectPriority( $b->{One_Consequence} ) ||
             $b->{Transcript_Length} <=> $a->{Transcript_Length}
         } @all_effects;
 
@@ -556,8 +555,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{End_Position} = $stop;
     $maf_line{Strand} = '+'; # Per MAF definition, only the positive strand is an accepted value
     $maf_line{STRAND_VEP} = $maf_effect->{STRAND}; # Renamed to avoid mixup with "Strand" above
-    my $so_effect = ( $maf_effect->{Effect} ? $maf_effect->{Effect} : $maf_effect->{Consequence} );
-    $maf_line{Variant_Classification} = GetVariantClassification( $so_effect, $var_type, $inframe );
+    $maf_line{Variant_Classification} = GetVariantClassification( $maf_effect->{One_Consequence}, $var_type, $inframe );
     $maf_line{Variant_Type} = $var_type;
     $maf_line{Reference_Allele} = $ref;
     # ::NOTE:: If tumor genotype is unavailable, then we'll assume it's ref/var heterozygous
@@ -593,7 +591,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{all_effects} = "";
     foreach my $effect ( @all_effects ) {
         my $gene_name = $effect->{Hugo_Symbol};
-        my $effect_type = ( $effect->{Effect} ? $effect->{Effect} : $effect->{Consequence} );
+        my $effect_type = $effect->{One_Consequence};
         my $protein_change = ( $effect->{HGVSp} ? $effect->{HGVSp} : '' );
         my $transcript_id = ( $effect->{Transcript_ID} ? $effect->{Transcript_ID} : '' );
         my $refseq_ids = ( $effect->{RefSeq} ? $effect->{RefSeq} : '' );
