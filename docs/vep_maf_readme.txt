@@ -91,6 +91,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 107. ExAC_AF_SAS - South Asian Allele Frequency from ExAC
 108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
 109. FILTER - False-positive filtering status, borrowed from the input MAF/VCF, and then tags ExAC "common_variants"
+110. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 
