@@ -375,7 +375,11 @@ while( my $line = $annotated_vcf_fh->getline ) {
             my @genotype = split( /[\/|]/, $tum_info{GT} );
             # In case of polyploid calls, choose the first non-REF allele, if any
             ( $var_allele_idx ) = grep {$_ ne "0"} @genotype;
-            $var_allele_idx = 1 unless( defined $var_allele_idx and $var_allele_idx =~ m/^\d+$/ );
+            # If GT was unhelpful, default to the first ALT allele and set GT to undefined
+            if( !defined $var_allele_idx or $var_allele_idx !~ m/^\d+$/ or $var_allele_idx >= scalar( @alleles )) {
+                $var_allele_idx = 1;
+                $tum_info{GT} = "./.";
+            }
         }
 
         # Standardize AD and DP based on data in the genotype fields
