@@ -311,7 +311,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual );
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -334,10 +334,11 @@ while( my $line = $annotated_vcf_fh->getline ) {
     next if( $line =~ m/^##/ );
 
     chomp( $line );
-    my ( $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, @rest ) = split( /\t/, $line );
+    my ( $chrom, $pos, $var_id, $ref, $alt, $var_qual, $filter, $info_line, $format_line, @rest ) = split( /\t/, $line );
 
-    # Set QUAL and FILTER to "." unless defined and non-empty
-    $qual = "." unless( defined $qual and $qual ne "" );
+    # Set ID, QUAL, and FILTER to "." unless defined and non-empty
+    $var_id = "." unless( defined $var_id and $var_id ne "" );
+    $var_qual = "." unless( defined $var_qual and $var_qual ne "" );
     $filter = "." unless( defined $filter and $filter ne "" );
 
     # If FORMATted genotype fields are available, find the sample with the variant, and matched normal
@@ -611,6 +612,10 @@ while( my $line = $annotated_vcf_fh->getline ) {
 
     # Also add the reference allele flanking bps that we generated earlier with samtools
     $maf_line{flanking_bps} = $flanking_bps{"$chrom:$vcf_pos"};
+
+    # Add ID and QUAL from the input VCF into respective MAF columns
+    $maf_line{variant_id} = $var_id;
+    $maf_line{variant_qual} = $var_qual;
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
     $maf_fh->print( join( "\t", map{( defined $maf_line{$_} ? $maf_line{$_} : "" )} @maf_header ) . "\n" );

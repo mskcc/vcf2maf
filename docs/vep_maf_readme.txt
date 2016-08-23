@@ -92,6 +92,8 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
 109. FILTER - False-positive filtering status, borrowed from the input MAF/VCF, and then tags ExAC "common_variants"
 110. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
+111. variant_id - The ID from an input VCF, or the variant_id from an input MAF
+112. variant_qual - The QUAL from an input VCF, or the variant_qual from an input MAF
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 

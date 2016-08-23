@@ -57,6 +57,8 @@ my %vcf_col_idx = ();
 my @var_pos = ();
 my %var_frmt = ();
 my %var_fltr = ();
+my %var_id = ();
+my %var_qual = ();
 
 while( my $line = $maf_fh->getline ) {
 
@@ -104,7 +106,7 @@ while( my $line = $maf_fh->getline ) {
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth across this site\">\n";
                 $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
             }
-            
+
             # Set genotype column indexes for the multi-sample VCF, and keep the pairing info
             $vcf_col_idx{ $t_id } = $idx++ if ( !exists $vcf_col_idx{ $t_id } );
             $vcf_col_idx{ $n_id } = $idx++ if ( !exists $vcf_col_idx{ $n_id } );
@@ -119,23 +121,25 @@ while( my $line = $maf_fh->getline ) {
     $line_count++; # Increment a counter for all non-header lines, to help with debugging
 
     # For each variant in the MAF, parse out data that can go into the output VCF
-    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2 ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 );
+    my ( $chr, $pos, $ref, $al1, $al2, $t_id, $n_id, $n_al1, $n_al2, $id, $qual, $filter ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2 variant_id variant_qual FILTER );
 
     # Handle a situation in Oncotator MAFs where alleles of DNPs are pipe "|" delimited:
     ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/\|//g; $_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
 
-    # Parse out the FILTER reasons if available, or set to "." if undefined
-    my ( $filter ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "." )} qw( FILTER );
-
     # Make sure that our minimum required columns contain proper data
     map{( !m/^\s*$/ ) or die "ERROR: $_ is empty in MAF line $line_count!\n" } qw( Chromosome Start_Position Reference_Allele Tumor_Sample_Barcode );
-    (( $col_idx{tumor_seq_allele1} and $col_idx{tumor_seq_allele1} !~ m/^\s*$/ ) or ( $col_idx{tumor_seq_allele2} and $col_idx{tumor_seq_allele2} !~ m/^\s*$/ )) or die "ERROR: Tumor_Seq_Alleles must be non-empty in MAF line $line_count!\n";
+    (( $col_idx{tumor_seq_allele1} and $col_idx{tumor_seq_allele1} !~ m/^\s*$/ ) or ( $col_idx{tumor_seq_allele2} and $col_idx{tumor_seq_allele2} !~ m/^\s*$/ )) or die "ERROR: At least one of the Tumor_Seq_Allele columns must be non-empty in MAF line $line_count!\n";
 
     # Parse out read counts for ref/var alleles, if available
     my ( $t_dp, $t_rad, $t_vad, $n_dp, $n_rad, $n_vad ) = map{ my $c = lc; (( defined $col_idx{$c} and defined $cols[$col_idx{$c}] and $cols[$col_idx{$c}] =~ m/^\d+/ ) ? sprintf( "%.0f", $cols[$col_idx{$c}] ) : '.' )} ( $tum_depth_col, $tum_rad_col, $tum_vad_col, $nrm_depth_col, $nrm_rad_col, $nrm_vad_col );
 
     # Normal sample ID could be undefined for legit reasons, but we need a placeholder name
-    $n_id = "NORMAL" if( $n_id eq "" );
+    $n_id = "NORMAL" if( !defined $n_id or $n_id eq "" );
+
+    # If VCF ID, QUAL, or FILTER are undefined or empty, set them to "." per proper VCF specs
+    $id = "." if( !defined $id or $id eq "" );
+    $qual = "." if( !defined $qual or $qual eq "" );
+    $filter = "." if( !defined $filter or $filter eq "" );
 
     # If normal alleles are unset in the MAF (quite common), assume homozygous reference
     $n_al1 = $ref if( $n_al1 eq "" );
@@ -204,23 +208,26 @@ while( my $line = $maf_fh->getline ) {
     # Contruct a VCF formatted line and append it to the respective VCF
     if( $per_tn_vcfs ) {
         my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
-        my $vcf_line = join( "\t", $chr, $pos, ".", $ref, $alt, ".", $filter, ".", "GT:AD:DP", $t_fmt, $n_fmt );
+        my $vcf_line = join( "\t", $chr, $pos, $id, $ref, $alt, $qual, $filter, ".", "GT:AD:DP", $t_fmt, $n_fmt );
         $tn_vcf{$vcf_file} .= "$vcf_line\n";
     }
 
     # Store VCF formatted data for the multi-sample VCF
-    my $key = join( "\t", $chr, $pos, ".", $ref, $alt);
+    my $key = join( "\t", $chr, $pos, $ref, $alt );
     push( @var_pos, $key ) unless( exists $var_frmt{ $key } );
-    $var_frmt{ $key }{ $vcf_col_idx{ $t_id } } = $t_fmt;
-    $var_frmt{ $key }{ $vcf_col_idx{ $n_id } } = $n_fmt;
+    $var_frmt{ $key }{ $vcf_col_idx{ $t_id }} = $t_fmt;
+    $var_frmt{ $key }{ $vcf_col_idx{ $n_id }} = $n_fmt;
+    # ::NOTE:: Samples shouldn't have different ID, QUAL, or FILTERs for the same loci+alleles
     $var_fltr{ $key } = $filter;
+    $var_id{ $key } = $id;
+    $var_qual{ $key } = $qual;
 }
 $maf_fh->close;
 
 # Write the cached contents of per-TN VCFs into files
 if( $per_tn_vcfs ) {
     foreach my $vcf_file ( keys %tn_vcf ) {
-        my $tn_vcf_fh = IO::File->new( $vcf_file, ">" ) or die "ERROR: Fail to create file $vcf_file\n";
+        my $tn_vcf_fh = IO::File->new( $vcf_file, ">" ) or die "ERROR: Failed to create file $vcf_file\n";
         $tn_vcf_fh->print( $tn_vcf{$vcf_file} );
         $tn_vcf_fh->close;
     }
@@ -240,9 +247,10 @@ $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\
 $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @vcf_cols) . "\n" );
 
 # Write each variant into the multi-sample VCF
-foreach my $var ( @var_pos ) {
-    $vcf_fh->print( join( "\t", $var, ".", $var_fltr{ $var }, ".", "GT:AD:DP" ));
-    map{ $vcf_fh->print( "\t" . (( exists $var_frmt{$var}{$_} ) ? $var_frmt{$var}{$_} : './.:.:.' ))}( 0..$#vcf_cols );
+foreach my $key ( @var_pos ) {
+    my ( $chr, $pos, $ref, $alt ) = split( "\t", $key );
+    $vcf_fh->print( join( "\t", $chr, $pos, $var_id{ $key }, $ref, $alt, $var_qual{ $key }, $var_fltr{ $key }, ".", "GT:AD:DP" ));
+    map{ $vcf_fh->print( "\t" . (( exists $var_frmt{$key}{$_} ) ? $var_frmt{$key}{$_} : './.:.:.' ))}( 0..$#vcf_cols );
     $vcf_fh->print( "\n" );
 }
 $vcf_fh->close;
