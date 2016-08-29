@@ -28,7 +28,7 @@ my $retain_cols = "Center,Verification_Status,Validation_Status,Mutation_Status,
 # Columns that should never be overridden since they are results of re-annotation
 my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id NCBI_Build
     Chromosome Start_Position End_Position Strand Variant_Classification Variant_Type
-    Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode
+    Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 dbSNP_RS Tumor_Sample_Barcode
     Matched_Norm_Sample_Barcode Match_Norm_Seq_Allele1 Match_Norm_Seq_Allele2
     Tumor_Validation_Allele1 Tumor_Validation_Allele2 Match_Norm_Validation_Allele1
     Match_Norm_Validation_Allele2 HGVSc HGVSp HGVSp_Short Transcript_ID Exon_Number t_depth
@@ -237,11 +237,11 @@ if( $retain_cols ) {
         my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
 
         # Parse the header line to map column names to their indexes
-        if( $line =~ m/^(Hugo_Symbol|Chromosome)/ ) {
+        if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/ ) {
             my $idx = 0;
             map{ my $c = lc; $input_maf_col_idx{$c} = $idx; ++$idx } @cols;
 
-            # Check if retaining columns not in old MAF, or that we shouldn't override in new MAF
+            # Check for columns to retain that are not in old MAF, or columns we shouldn't override in new MAF
             foreach my $c ( split( ",", $retain_cols )) {
                 my $c_lc = lc( $c );
                 if( !defined $input_maf_col_idx{$c_lc} ) {
@@ -253,12 +253,18 @@ if( $retain_cols ) {
             }
         }
         else {
-            # Figure out which of the tumor alleles is non-reference
-            my ( $ref, $al1, $al2 ) = map{ my $c = lc; ( defined $input_maf_col_idx{$c} ? $cols[$input_maf_col_idx{$c}] : "" ) } qw( Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 );
-            my $var_allele = (( defined $al1 and $al1 and $al1 ne $ref ) ? $al1 : $al2 );
+            # Extract minimal variant info, and figure out which of the tumor alleles is non-REF
+            my ( $chr, $pos, $ref, $al1, $al2, $sample_id ) = map{ my $c = lc; ( defined $input_maf_col_idx{$c} ? $cols[$input_maf_col_idx{$c}] : "" ) } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
+            my $var = (( defined $al1 and $al1 and $al1 ne $ref ) ? $al1 : $al2 );
+
+            # Remove any prefixed reference bps from alleles, using "-" for simple indels
+            while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
+                ( $ref, $var ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var );
+                ++$pos unless( $ref eq "-" );
+            }
 
             # Create a key for this variant using Chromosome:Start_Position:Tumor_Sample_Barcode:Reference_Allele:Variant_Allele
-            my $key = join( ":", ( map{ my $c = lc; $cols[$input_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele )), $var_allele );
+            my $key = join( ":", $chr, $pos, $sample_id, $ref, $var );
 
             # Store values for this variant into a hash, adding column names to the key
             foreach my $c ( map{lc} split( ",", $retain_cols )) {
