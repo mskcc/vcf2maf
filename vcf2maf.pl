@@ -11,7 +11,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/84_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
+my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/85_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
 my $perl_bin = $Config{perlpath};
 
@@ -208,6 +208,11 @@ GetOptions(
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
+# Check if required arguments are missing or problematic
+( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
+( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
+( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
 $vcf_normal_id = $normal_id unless( $vcf_normal_id );
@@ -219,11 +224,9 @@ if( $custom_enst_file ) {
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
-# Before running annotation, let's pull flanking bps for each variant and do some checks
-( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
-( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+# Before running annotation, let's pull flanking bps for each variant to do some checks
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
-my ( %ref_bps, @ref_loci, $regions );
+my ( %ref_bps, @ref_loci, $regions, %flanking_bps );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
@@ -235,13 +238,12 @@ while( my $line = $vcf_fh->getline ) {
 }
 $vcf_fh->close;
 
-my %flanking_bps;
 # samtools runs faster when passed many loci at a time, but has an arg limit of `getconf ARG_MAX`
 foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $regions` ))) {
     my ( $locus, $bps ) = split( "\n", $line );
     if( $bps ){
         $bps = uc( $bps );
-        # Restore the original chrom and position from the input VCF
+        # Restore the original chrom and position without flanking bps
         ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $locus );
         $flanking_bps{$locus} = $bps;
     }
@@ -252,7 +254,7 @@ foreach my $ref_locus ( @ref_loci ) {
     my $ref = $ref_bps{$ref_locus};
     my ( $chr, $pos ) = split( ":", $ref_locus );
     if( !defined $flanking_bps{$ref_locus} ) {
-        warn "WARNING: Couldn't Retrieve bps around $ref_locus from reference FASTA: $ref_fasta\n";
+        warn "WARNING: Couldn't retrieve bps around $ref_locus from reference FASTA: $ref_fasta\n";
     }
     elsif( $flanking_bps{$ref_locus} !~ m/^[ACGTN]+$/ ) {
         warn "WARNING: Retrieved invalid bps " . $flanking_bps{$ref_locus} . " around $ref_locus from reference FASTA: $ref_fasta\n";
@@ -766,10 +768,10 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/84_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/85_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 84) [Default: Installed version]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 85) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --help           Print a brief help message and quit
