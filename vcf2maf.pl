@@ -12,7 +12,7 @@ use Config;
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/85_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7 );
 my $perl_bin = $Config{perlpath};
 
 # Find out where samtools is installed, and warn the user if it's not
@@ -203,6 +203,7 @@ GetOptions(
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
     'maf-center=s' => \$maf_center,
+    'retain-info=s' => \$retain_info,
     'min-hom-vaf=s' => \$min_hom_vaf
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
@@ -317,6 +318,15 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
+# If the user has INFO fields they want to retain, create additional columns for those
+my @addl_info_cols = ();
+if( $retain_info ) {
+    # But let's not overwrite existing columns with the same name
+    my %maf_cols = map{ my $c = lc; ( $c, 1 )} @maf_header;
+    @addl_info_cols = grep{ my $c = lc; !$maf_cols{$c}} split( ",", $retain_info );
+    push( @maf_header, @addl_info_cols );
+}
+
 # Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
@@ -357,7 +367,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     }
 
     # Parse out the data in the info column, and store into a hash
-    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "" ))} split( /\;/, $info_line );
+    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
 
     # By default, the variant allele is the first (usually the only) allele listed under ALT
     # If there are multiple ALT alleles, choose the allele specified in the tumor GT field
@@ -546,7 +556,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         $maf_effect = $all_effects[0] unless( $maf_effect );
     }
 
-    # Construct the MAF columns from the $maf_effect hash, and print to output
+    # Construct the MAF columns from the $maf_effect hash
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
     $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
     $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Transcript_ID} );
@@ -618,6 +628,11 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Add ID and QUAL from the input VCF into respective MAF columns
     $maf_line{variant_id} = $var_id;
     $maf_line{variant_qual} = $var_qual;
+
+    # If there are additional INFO data to add, then add those
+    foreach my $info_col ( @addl_info_cols ) {
+        $maf_line{$info_col} = ( $info{$info_col} ? $info{$info_col} : "" );
+    }
 
     # At this point, we've generated all we can about this variant, so write it to the MAF
     $maf_fh->print( join( "\t", map{( defined $maf_line{$_} ? $maf_line{$_} : "" )} @maf_header ) . "\n" );
@@ -773,6 +788,7 @@ __DATA__
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 85) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
+ --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
