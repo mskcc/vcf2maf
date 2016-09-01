@@ -258,7 +258,7 @@ if( $retain_cols ) {
             my $var = (( defined $al1 and $al1 and $al1 ne $ref ) ? $al1 : $al2 );
 
             # Remove any prefixed reference bps from alleles, using "-" for simple indels
-            while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
+            while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
                 ( $ref, $var ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var );
                 ++$pos unless( $ref eq "-" );
             }

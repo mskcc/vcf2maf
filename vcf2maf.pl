@@ -433,7 +433,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
     # Remove any prefixed reference bps from all alleles, using "-" for simple indels
     my $vcf_pos = $pos;
-    while( substr( $ref, 0, 1 ) eq substr( $var, 0, 1 )) {
+    while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
         ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
         --$ref_length; --$var_length; ++$pos;
     }
