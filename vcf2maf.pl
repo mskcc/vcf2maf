@@ -327,6 +327,15 @@ if( $retain_info ) {
     push( @maf_header, @addl_info_cols );
 }
 
+# Locate and load the file mapping ENSG IDs to Entrez IDs
+my ( $script_dir ) = $0 =~ m/^(.*)\/vcf2maf/;
+$script_dir = "." unless( $script_dir );
+my $entrez_id_file = "$script_dir/data/ensg_to_entrez_id_map_ensembl_feb2014.tsv";
+my %entrez_id_map = ();
+if( -s $entrez_id_file ) {
+    %entrez_id_map = map{chomp; split("\t")} `grep -hv ^# $entrez_id_file`;
+}
+
 # Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
@@ -560,7 +569,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
     $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
     $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Transcript_ID} );
-    $maf_line{Entrez_Gene_Id} = '0';
+    $maf_line{Entrez_Gene_Id} = ( defined $entrez_id_map{$maf_effect->{Gene}} ? $entrez_id_map{$maf_effect->{Gene}} : "0" );
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
     $maf_line{Chromosome} = $chrom;
