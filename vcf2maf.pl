@@ -233,9 +233,11 @@ while( my $line = $vcf_fh->getline ) {
     next if( $line =~ m/^#/ );
     chomp( $line );
     my ( $chr, $pos, undef, $ref ) = split( /\t/, $line );
-    $ref_bps{"$chr:$pos"} = $ref;
-    push( @ref_loci, "$chr:$pos" );
-    $regions .= " $chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
+    # Create a locus that spans the length of the reference allele and 1bp flanks around it
+    my $locus = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
+    $ref_bps{$locus} = $ref;
+    push( @ref_loci, $locus );
+    $regions .= " $locus";
 }
 $vcf_fh->close;
 
@@ -244,8 +246,6 @@ foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $region
     my ( $locus, $bps ) = split( "\n", $line );
     if( $bps ){
         $bps = uc( $bps );
-        # Restore the original chrom and position without flanking bps
-        ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $locus );
         $flanking_bps{$locus} = $bps;
     }
 }
@@ -253,15 +253,15 @@ foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $region
 # For each variant locus and reference allele in the input VCF, report any problems
 foreach my $ref_locus ( @ref_loci ) {
     my $ref = $ref_bps{$ref_locus};
-    my ( $chr, $pos ) = split( ":", $ref_locus );
+    my ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $ref_locus );
     if( !defined $flanking_bps{$ref_locus} ) {
-        warn "WARNING: Couldn't retrieve bps around $ref_locus from reference FASTA: $ref_fasta\n";
+        warn "WARNING: Couldn't retrieve bps around $locus from reference FASTA: $ref_fasta\n";
     }
     elsif( $flanking_bps{$ref_locus} !~ m/^[ACGTN]+$/ ) {
-        warn "WARNING: Retrieved invalid bps " . $flanking_bps{$ref_locus} . " around $ref_locus from reference FASTA: $ref_fasta\n";
+        warn "WARNING: Retrieved invalid bps " . $flanking_bps{$ref_locus} . " around $locus from reference FASTA: $ref_fasta\n";
     }
     elsif( $ref ne substr( $flanking_bps{$ref_locus}, 1, length( $ref ))) {
-        warn "WARNING: Reference allele $ref at $ref_locus doesn't match " .
+        warn "WARNING: Reference allele $ref at $locus doesn't match " .
             substr( $flanking_bps{$ref_locus}, 1, length( $ref )) . " (flanking bps: " .
             $flanking_bps{$ref_locus} . ") from reference FASTA: $ref_fasta\n";
     }
@@ -440,8 +440,9 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
     my $start = my $stop = my $var_type = my $inframe = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
+    # Backup the position and reference allele from the VCF, so we can use it to fetch flanking_bps
+    my ( $vcf_pos, $vcf_ref ) = ( $pos, $ref );
     # Remove any prefixed reference bps from all alleles, using "-" for simple indels
-    my $vcf_pos = $pos;
     while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
         ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
         --$ref_length; --$var_length; ++$pos;
@@ -632,7 +633,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{FILTER} = $filter;
 
     # Also add the reference allele flanking bps that we generated earlier with samtools
-    $maf_line{flanking_bps} = $flanking_bps{"$chrom:$vcf_pos"};
+    my $locus = "$chrom:" . ( $vcf_pos - 1 ) . "-" . ( $vcf_pos + length( $vcf_ref ));
+    $maf_line{flanking_bps} = $flanking_bps{$locus};
 
     # Add ID and QUAL from the input VCF into respective MAF columns
     $maf_line{variant_id} = $var_id;
