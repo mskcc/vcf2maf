@@ -54,7 +54,7 @@ unless( defined $output_vcf ) {
 
 # Before anything, let's parse the headers of this supposed "MAF-like" file and do some checks
 my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open input MAF: $input_maf!\n";
-my ( %uniq_regions, %preceding_bp, @tn_pair, %col_idx, $header_line );
+my ( %uniq_regions, %flanking_bps, @tn_pair, %col_idx, $header_line );
 while( my $line = $maf_fh->getline ) {
 
     # Skip comment lines
@@ -87,8 +87,9 @@ while( my $line = $maf_fh->getline ) {
     ( %col_idx ) or die "ERROR: Couldn't find a header line (must start with Hugo_Symbol, Chromosome, or Tumor_Sample_Barcode): $input_maf\n";
 
     # For each variant in the MAF, parse out the locus for running samtools faidx later
-    my ( $chr, $pos ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position );
-    my $region = "$chr:" . ( $pos - 1 ) . "-$pos"; # Includes preceding bp needed in VCF format
+    my ( $chr, $pos, $ref ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele );
+    $ref =~ s/^(\?|-|0)+$//; # Blank out the dashes (or other weird chars) used with indels
+    my $region = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
     $uniq_regions{$region} = 1;
 }
 $maf_fh->close;
@@ -99,9 +100,7 @@ foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $region
     my ( $locus, $bps ) = split( "\n", $line );
     if( $bps ){
         $bps = uc( $bps );
-        # Restore the original chrom and position without preceding bps
-        ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $locus );
-        $preceding_bp{$locus} = $bps;
+        $flanking_bps{$locus} = $bps;
     }
 }
 
@@ -200,10 +199,10 @@ while( my $line = $maf_fh->getline ) {
     ( $n_al1, $n_al2 ) = ( $n_al2, $n_al1 ) if( $n_al2 eq $ref );
 
     # Except for MAF-format simple insertions, check ref alleles, and skip lines that mismatch
+    my $locus = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
     if( $ref ne "" ) {
-        my $ref_bp = substr( $ref, 0, 1 );
-        my $ref_bp_from_fasta = substr( $preceding_bp{"$chr:$pos"}, 1, 1 );
-        if( $ref_bp ne $ref_bp_from_fasta ) {
+        my $ref_from_fasta = substr( $flanking_bps{$locus}, 1, -1 );
+        if( $ref ne $ref_from_fasta ) {
             # Create the file for skipped variants, if it wasn't already
             unless( $skipped_fh ) {
                 my $skip_file = "$output_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
@@ -220,9 +219,9 @@ while( my $line = $maf_fh->getline ) {
     # To represent indels in VCF format, we need the preceding bp in the reference FASTA
     my ( $ref_len, $al1_len, $al2_len ) = map{ length( $_ ) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 or ( $ref_len ne $al2_len and substr( $ref, 0, 1 ) ne substr( $al2, 0, 1 ))) {
-        my $prefix_bp = substr( $preceding_bp{"$chr:$pos"}, 0, 1 );
+        my $prefix_bp = substr( $flanking_bps{$locus}, 0, 1 );
         # For MAF-format simple insertions, $pos is already the locus of the preceding bp
-        $prefix_bp = substr( $preceding_bp{"$chr:$pos"}, 1, 1 ) if( $ref eq "" );
+        $prefix_bp = substr( $flanking_bps{$locus}, 1, 1 ) if( $ref eq "" );
         # If this is not a MAF-format simple insertion, decrement $pos
         --$pos unless( $ref eq "" );
         # Prefix the fetched reference bp to all the alleles
