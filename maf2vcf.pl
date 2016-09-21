@@ -102,6 +102,9 @@ foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $region
         $bps = uc( $bps );
         $flanking_bps{$locus} = $bps;
     }
+    else {
+        warn "WARNING: Unable to retrieve bps for $locus from $ref_fasta\n";
+    }
 }
 
 # Parse through each variant in the MAF, and fill up the respective per-sample VCFs

@@ -122,7 +122,7 @@ else {
     # Add options that work for most species, except a few
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
     # Add options that only work on human variants mapped to the GRCh37 reference genome
-    $vep_cmd .= " --plugin ExAC,$vep_data/ExAC.r0.3.sites.minus_somatic.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
+    $vep_cmd .= " --plugin ExAC,$vep_data/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
