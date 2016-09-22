@@ -94,6 +94,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 110. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
 111. variant_id - The ID from an input VCF, or the variant_id from an input MAF
 112. variant_qual - The QUAL from an input VCF, or the variant_qual from an input MAF
+113. ExAC_AF_Adj - Global Adjusted Allele frequency from ExAC
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 

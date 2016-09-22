@@ -314,7 +314,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual ExAC_AF_Adj );
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
