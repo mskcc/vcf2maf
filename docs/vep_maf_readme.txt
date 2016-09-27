@@ -68,7 +68,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 84. AA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP African American population
 85. EA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP European American population
 86. CLIN_SIG - clinical significance of variant from dbSNP
-87. SOMATIC - somatic status of existing variation(s)
+87. SOMATIC - somatic status of IDs reported under Existing_variation
 88. PUBMED - pubmed ID(s) of publications that cite existing variant
 89. MOTIF_NAME - the source and identifier of a transcription factor binding profile aligned at this position
 90. MOTIF_POS - the relative position of the variation in the aligned TFBP
