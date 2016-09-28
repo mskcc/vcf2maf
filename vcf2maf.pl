@@ -227,26 +227,34 @@ if( $custom_enst_file ) {
 
 # Before running annotation, let's pull flanking bps for each variant to do some checks
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
-my ( %ref_bps, @ref_loci, $regions, %flanking_bps );
+my ( %ref_bps, @ref_loci, %flanking_bps, %uniq_regions );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
     chomp( $line );
     my ( $chr, $pos, undef, $ref ) = split( /\t/, $line );
     # Create a locus that spans the length of the reference allele and 1bp flanks around it
-    my $locus = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
-    $ref_bps{$locus} = $ref;
-    push( @ref_loci, $locus );
-    $regions .= " $locus";
+    my $region = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
+    $ref_bps{$region} = $ref;
+    push( @ref_loci, $region );
+    $uniq_regions{$region} = 1;
 }
 $vcf_fh->close;
 
-# samtools runs faster when passed many loci at a time, but has an arg limit of `getconf ARG_MAX`
-foreach my $line ( grep( length, split( ">", `$samtools faidx $ref_fasta $regions` ))) {
+# samtools runs faster when passed many loci at a time, but limited to around 125k args at least on
+# CentOS6. If there are too many loci, let's split them into 100k chunks and run separately
+my ( @regions_split, $lines );
+my @regions = keys %uniq_regions;
+push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
+map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
+foreach my $line ( grep( length, split( ">", $lines ))) {
     my ( $locus, $bps ) = split( "\n", $line );
     if( $bps ){
         $bps = uc( $bps );
         $flanking_bps{$locus} = $bps;
+    }
+    else {
+        warn "WARNING: Unable to retrieve bps for $locus from $ref_fasta\n";
     }
 }
 
