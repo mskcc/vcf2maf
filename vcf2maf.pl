@@ -248,7 +248,9 @@ my @regions = keys %uniq_regions;
 push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
 map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
-    my ( $locus, $bps ) = split( "\n", $line );
+    # Carefully split this FASTA entry, properly chomping newlines for long indels
+    my ( $locus, $bps ) = split( "\n", $line, 2 );
+    $bps =~ s/\r|\n//g;
     if( $bps ){
         $bps = uc( $bps );
         $flanking_bps{$locus} = $bps;
