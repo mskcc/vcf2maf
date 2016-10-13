@@ -15,7 +15,7 @@ Download the latest stable branch of vcf2maf, and view the detailed usage manual
 
 To download properly versioned releases, [click here](https://github.com/mskcc/vcf2maf/releases) for a list.
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/176fe3199ed7cea682a68d438b8fdffb). VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/f265ea7c59a880e28b1e533a6e935697). VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
 
     perl vcf2maf.pl --input-vcf data/test.vcf --output-maf data/test.vep.maf
 
