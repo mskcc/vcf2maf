@@ -186,7 +186,7 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
-my ( $input_vcf, $output_maf, $tmp_dir,  $custom_enst_file );
+my ( $input_vcf, $output_maf, $tmp_dir, $custom_enst_file );
 my ( $vcf_tumor_id, $vcf_normal_id );
 GetOptions(
     'help!' => \$help,
@@ -815,6 +815,7 @@ __DATA__
 
  --input-vcf      Path to input file in VCF format
  --output-maf     Path to output MAF file [Default: STDOUT]
+ --tmp-dir        Folder to retain intermediate VCFs after runtime [Default: usually /tmp]
  --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
