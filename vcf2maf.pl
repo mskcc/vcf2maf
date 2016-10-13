@@ -7,6 +7,8 @@ use warnings;
 use IO::File;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
+use File::Temp qw( tempdir );
+use File::Path qw( mkpath rmtree );
 use Config;
 
 # Set any default paths and constants
@@ -184,13 +186,14 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
-my ( $input_vcf, $output_maf, $custom_enst_file );
+my ( $input_vcf, $output_maf, $tmp_dir,  $custom_enst_file );
 my ( $vcf_tumor_id, $vcf_normal_id );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
     'input-vcf=s' => \$input_vcf,
     'output-maf=s' => \$output_maf,
+    'tmp-dir=s' => \$tmp_dir,
     'tumor-id=s' => \$tumor_id,
     'normal-id=s' => \$normal_id,
     'vcf-tumor-id=s' => \$vcf_tumor_id,
@@ -214,6 +217,14 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
 ( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+
+# Create a temporary directory for our intermediate files, unless the user wants to use their own
+if( $tmp_dir ) {
+    mkpath( $tmp_dir );
+}
+else {
+    $tmp_dir = tempdir( CLEANUP => 1 );
+}
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
@@ -279,17 +290,23 @@ foreach my $ref_locus ( @ref_loci ) {
 }
 
 # Annotate variants in given VCF to all possible transcripts
-my $output_vcf = $input_vcf;
-$output_vcf =~ s/(\.vcf)*$/.vep.vcf/;
-# Skip running VEP if an annotated VCF already exists
-unless( -s $output_vcf ) {
-    warn "STATUS: Running VEP and writing to: $output_vcf\n";
+my $output_vcf = "$tmp_dir/" . substr( $input_vcf, rindex( $input_vcf, '/' ) + 1 );
+$output_vcf =~ s/(\.)?(tsv|txt)?$/.vcf/;
+my $vep_anno = $output_vcf;
+$vep_anno =~ s/\.vcf$/.vep.vcf/;
+
+# Skip running VEP if a VEP-annotated VCF already exists
+if( -s $vep_anno ) {
+    warn "WARNING: Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
+}
+else {
+    warn "STATUS: Running VEP and writing to: $vep_anno\n";
     # Make sure we can find the VEP script and the reference FASTA
     ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
     ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
+    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $vep_anno";
     # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
     # Add --cache-version only if the user specifically asked for a version
@@ -303,7 +320,7 @@ unless( -s $output_vcf ) {
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
+    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -341,6 +358,7 @@ if( $retain_info ) {
 # Locate and load the file mapping ENSG IDs to Entrez IDs
 my ( $script_dir ) = $0 =~ m/^(.*)\/vcf2maf/;
 $script_dir = "." unless( $script_dir );
+
 my $entrez_id_file = "$script_dir/data/ensg_to_entrez_id_map_ensembl_feb2014.tsv";
 my %entrez_id_map = ();
 if( -s $entrez_id_file ) {
@@ -352,8 +370,8 @@ if( -s $entrez_id_file ) {
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
-( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
+( -s $vep_anno ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
+my $annotated_vcf_fh = IO::File->new( $vep_anno ) or die "ERROR: Couldn't open annotated VCF: $vep_anno!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $annotated_vcf_fh->getline ) {
 
