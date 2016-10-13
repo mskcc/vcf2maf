@@ -14,4 +14,4 @@ chdir $script_dir;
 use Test::Simple tests => 3;
 ok( system( "perl maf2vcf.pl --help > /dev/null" ) == 0 );
 ok( system( "perl maf2vcf.pl --man > /dev/null" ) == 0 );
-ok( system( "perl maf2vcf.pl --input-maf data/test.maf --output-dir data/vcfs --per-tn-vcfs" ) == 0 );
+ok( system( "perl maf2vcf.pl --input-maf tests/test.maf --output-dir tests/vcfs --per-tn-vcfs" ) == 0 );

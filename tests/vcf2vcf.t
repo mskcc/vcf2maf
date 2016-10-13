@@ -14,4 +14,4 @@ chdir $script_dir;
 use Test::Simple tests => 3;
 ok( system( "perl vcf2vcf.pl --help > /dev/null" ) == 0 );
 ok( system( "perl vcf2vcf.pl --man > /dev/null" ) == 0 );
-ok( system( "perl vcf2vcf.pl --input-vcf data/test.vcf --output-vcf data/test_fixed.vcf --add-filters" ) == 0 );
+ok( system( "perl vcf2vcf.pl --input-vcf tests/test.vcf --output-vcf tests/test_fixed.vcf --add-filters" ) == 0 );

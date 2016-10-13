@@ -14,4 +14,4 @@ chdir $script_dir;
 use Test::Simple tests => 3;
 ok( system( "perl maf2maf.pl --help > /dev/null" ) == 0 );
 ok( system( "perl maf2maf.pl --man > /dev/null" ) == 0 );
-ok( system( "perl maf2maf.pl --input-maf data/test.maf --output-maf data/test.vep.maf --custom-enst data/isoform_overrides_at_mskcc" ) == 0 );
+ok( system( "perl maf2maf.pl --input-maf tests/test.maf --output-maf tests/test.vep.maf --custom-enst data/isoform_overrides_at_mskcc" ) == 0 );
