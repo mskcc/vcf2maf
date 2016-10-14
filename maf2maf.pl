@@ -9,7 +9,7 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 use File::Temp qw( tempdir );
 use File::Copy qw( move );
-use File::Path qw( mkpath rmtree );
+use File::Path qw( mkpath );
 use Config;
 
 # Set any default paths and constants
@@ -69,7 +69,7 @@ GetOptions(
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
     'cache-version=s' => \$cache_version,
-    'ref-fasta=s' => \$ref_fasta,
+    'ref-fasta=s' => \$ref_fasta
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -362,7 +362,7 @@ __DATA__
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
- --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
+ --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 86) [Default: Installed version]
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --help           Print a brief help message and quit

@@ -13,9 +13,8 @@ my $ref_fasta = "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.d
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 
-# Find out where samtools is installed, and warn the user if it's not
-my $samtools = ( -e "/opt/bin/samtools" ? "/opt/bin/samtools" : "/usr/bin/samtools" );
-$samtools = `which samtools` unless( -e $samtools );
+# Find out if samtools is properly installed, and warn the user if it's not
+my $samtools = `which samtools`;
 chomp( $samtools );
 ( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
 

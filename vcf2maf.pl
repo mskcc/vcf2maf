@@ -7,8 +7,7 @@ use warnings;
 use IO::File;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
-use File::Temp qw( tempdir );
-use File::Path qw( mkpath rmtree );
+use File::Path qw( mkpath );
 use Config;
 
 # Set any default paths and constants
@@ -17,9 +16,8 @@ my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7 );
 my $perl_bin = $Config{perlpath};
 
-# Find out where samtools is installed, and warn the user if it's not
-my $samtools = ( -e "/opt/bin/samtools" ? "/opt/bin/samtools" : "/usr/bin/samtools" );
-$samtools = `which samtools` unless( -e $samtools );
+# Find out if samtools is properly installed, and warn the user if it's not
+my $samtools = `which samtools`;
 chomp( $samtools );
 ( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
 
@@ -118,6 +116,7 @@ sub GetBiotypePriority {
         'rRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'lincRNA' => 3, # Long, intervening noncoding (linc) RNAs, that can be found in evolutionarily conserved, intergenic regions
         'bidirectional_promoter_lncrna' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
+        'bidirectional_promoter_lncRNA' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
         'known_ncrna' => 4,
         'vaultRNA' => 4, # Short non coding RNA genes that form part of the vault ribonucleoprotein complex
         'macro_lncRNA' => 4, # unspliced lncRNAs that are several kb in size
@@ -128,6 +127,7 @@ sub GetBiotypePriority {
         'sense_intronic' => 5, # Long non-coding transcript in introns of a coding gene that does not overlap any exons
         'sense_overlapping' => 5, # Long non-coding transcript that contains a coding gene in its intron on the same strand
         '3prime_overlapping_ncrna' => 5, # Transcripts where ditag and/or published experimental data strongly supports the existence of short non-coding transcripts transcribed from the 3'UTR
+        '3prime_overlapping_ncRNA' => 5, # Transcripts where ditag and/or published experimental data strongly supports the existence of short non-coding transcripts transcribed from the 3'UTR
         'misc_RNA' => 5, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'non_coding' => 5, # Transcript which is known from the literature to not be protein coding
         'regulatory_region' => 6, # A region of sequence that is involved in the control of a biological process
@@ -187,7 +187,7 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help ) = ( 0, 0 );
 my ( $input_vcf, $output_maf, $tmp_dir, $custom_enst_file );
-my ( $vcf_tumor_id, $vcf_normal_id );
+my ( $vcf_tumor_id, $vcf_normal_id, $remap_chain );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -207,7 +207,8 @@ GetOptions(
     'ncbi-build=s' => \$ncbi_build,
     'maf-center=s' => \$maf_center,
     'retain-info=s' => \$retain_info,
-    'min-hom-vaf=s' => \$min_hom_vaf
+    'min-hom-vaf=s' => \$min_hom_vaf,
+    'remap-chain=s' => \$remap_chain
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -217,14 +218,6 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
 ( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
-
-# Create a temporary directory for our intermediate files, unless the user wants to use their own
-if( $tmp_dir ) {
-    mkpath( $tmp_dir );
-}
-else {
-    $tmp_dir = tempdir( CLEANUP => 1 );
-}
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
@@ -237,6 +230,58 @@ if( $custom_enst_file ) {
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
+# Create a folder for the intermediate VCFs if user-defined, or default to the input VCF's folder
+if( defined $tmp_dir ) {
+    mkpath( $tmp_dir ) unless( -d $tmp_dir );
+}
+else {
+    $tmp_dir = substr( $input_vcf, 0, rindex( $input_vcf, "/" )) if( $input_vcf =~ m/\// );
+    $tmp_dir = "." unless( $tmp_dir ); # In case the input VCF is in the current working directory
+}
+
+# Also figure out the base name of the input VCF, cuz we'll be naming a lot of files based on that
+my $input_name = substr( $input_vcf, rindex( $input_vcf, "/" ) + 1 );
+$input_name =~ s/(\.vcf)*$//;
+
+# If a liftOver chain was provided, remap and replace the input VCF before annotation
+my ( %remap, %remap_back );
+if( $remap_chain ) {
+    # Find out if liftOver is properly installed, and warn the user if it's not
+    my $liftover = `which liftOver`;
+    chomp( $liftover );
+    ( $liftover and -e $liftover ) or die "ERROR: Please install liftOver, and make sure it's in your PATH\n";
+
+    # Create a temporary folder where we can dump the intermediate files before/after liftOver
+    `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/$input_name.bed`;
+    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/$input_name.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
+    %remap_back = reverse %remap; # This is for restoring original loci in the annotated VCF
+    unlink( "$tmp_dir/$input_name.bed" );
+
+    # Create a new VCF in the temp folder, with remapped loci on which we'll run annotation
+    my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
+    my $remap_vcf_fh = IO::File->new( "$tmp_dir/$input_name.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.remap.vcf!\n";
+    while( my $line = $orig_vcf_fh->getline ) {
+        if( $line =~ m/^#/ ) {
+            $remap_vcf_fh->print( $line ); # Write header lines unchanged
+        }
+        else {
+            chomp( $line );
+            my @cols = split( "\t", $line );
+            my $locus = $cols[0] . ":" . $cols[1];
+            if( defined $remap{$locus} ) {
+                @cols[0,1] = split( ":", $remap{$locus} );
+                $remap_vcf_fh->print( join( "\t", @cols ), "\n" );
+            }
+            else {
+                warn "WARNING: Skipping variant at $locus; Unable to liftOver using $remap_chain\n";
+            }
+        }
+    }
+    $remap_vcf_fh->close;
+    $orig_vcf_fh->close;
+    $input_vcf = "$tmp_dir/$input_name.remap.vcf";
+}
+
 # Before running annotation, let's pull flanking bps for each variant to do some checks
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
 my ( %ref_bps, @ref_loci, %flanking_bps, %uniq_regions );
@@ -244,7 +289,7 @@ while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
     chomp( $line );
-    my ( $chr, $pos, undef, $ref ) = split( /\t/, $line );
+    my ( $chr, $pos, undef, $ref ) = split( "\t", $line );
     # Create a locus that spans the length of the reference allele and 1bp flanks around it
     my $region = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
     $ref_bps{$region} = $ref;
@@ -290,23 +335,16 @@ foreach my $ref_locus ( @ref_loci ) {
 }
 
 # Annotate variants in given VCF to all possible transcripts
-my $output_vcf = "$tmp_dir/" . substr( $input_vcf, rindex( $input_vcf, '/' ) + 1 );
-$output_vcf =~ s/(\.)?(tsv|txt)?$/.vcf/;
-my $vep_anno = $output_vcf;
-$vep_anno =~ s/\.vcf$/.vep.vcf/;
-
-# Skip running VEP if a VEP-annotated VCF already exists
-if( -s $vep_anno ) {
-    warn "WARNING: Annotated VCF already exists ($vep_anno). Skipping re-annotation.\n";
-}
-else {
-    warn "STATUS: Running VEP and writing to: $vep_anno\n";
+my $output_vcf = ( $remap_chain ? "$tmp_dir/$input_name.remap.vep.vcf" : "$tmp_dir/$input_name.vep.vcf" );
+# Skip running VEP if an annotated VCF already exists
+unless( -s $output_vcf ) {
+    warn "STATUS: Running VEP and writing to: $output_vcf\n";
     # Make sure we can find the VEP script and the reference FASTA
     ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
     ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $vep_anno";
+    my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
     # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
     # Add --cache-version only if the user specifically asked for a version
@@ -320,7 +358,7 @@ else {
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -370,8 +408,8 @@ if( -s $entrez_id_file ) {
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
 $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
-( -s $vep_anno ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $annotated_vcf_fh = IO::File->new( $vep_anno ) or die "ERROR: Couldn't open annotated VCF: $vep_anno!\n";
+( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
+my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx );
 while( my $line = $annotated_vcf_fh->getline ) {
 
@@ -384,7 +422,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     next if( $line =~ m/^##/ );
 
     chomp( $line );
-    my ( $chrom, $pos, $var_id, $ref, $alt, $var_qual, $filter, $info_line, $format_line, @rest ) = split( /\t/, $line );
+    my ( $chrom, $pos, $var_id, $ref, $alt, $var_qual, $filter, $info_line, $format_line, @rest ) = split( "\t", $line );
 
     # Set ID, QUAL, and FILTER to "." unless defined and non-empty
     $var_id = "." unless( defined $var_id and $var_id ne "" );
@@ -443,7 +481,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
                 $var_allele_idx = $i if( $tum_depths[$i] and $tum_depths[$i] > $tum_depths[$var_allele_idx] );
             }
             $tum_info{GT} = "./.";
-            if( defined $tum_info{DP} and $tum_info{DP} != 0 and defined $tum_depths[$var_allele_idx] ) {
+            if( defined $tum_info{DP} and $tum_info{DP} ne '.' and $tum_info{DP} != 0 and defined $tum_depths[$var_allele_idx] ) {
                 my $vaf = $tum_depths[$var_allele_idx] / $tum_info{DP};
                 $tum_info{GT} = ( $vaf < $min_hom_vaf ? "0/1" : "1/1" );
             }
@@ -815,7 +853,7 @@ __DATA__
 
  --input-vcf      Path to input file in VCF format
  --output-maf     Path to output MAF file [Default: STDOUT]
- --tmp-dir        Folder to retain intermediate VCFs after runtime [Default: usually /tmp]
+ --tmp-dir        Folder to retain intermediate VCFs after runtime [Default: Folder containing input VCF]
  --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
@@ -831,6 +869,7 @@ __DATA__
  --maf-center     Variant calling center to report in MAF [.]
  --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
+ --remap-chain    Chain file to remap variants to a different assembly before running VEP
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
@@ -851,6 +890,7 @@ This script needs VEP, a variant annotator that maps effects of a variant on all
 =head1 AUTHORS
 
  Cyriac Kandoth (ckandoth@gmail.com)
+ Shweta Chavan (chavan.shweta@gmail.com)
 
 =head1 LICENSE
 
