@@ -205,6 +205,7 @@ GetOptions(
     'ref-fasta=s' => \$ref_fasta,
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
+    'cache-version=s' => \$cache_version,
     'maf-center=s' => \$maf_center,
     'retain-info=s' => \$retain_info,
     'min-hom-vaf=s' => \$min_hom_vaf,
