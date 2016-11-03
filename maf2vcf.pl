@@ -14,8 +14,7 @@ my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_al
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 
 # Find out if samtools is properly installed, and warn the user if it's not
-my $samtools = `which samtools`;
-chomp( $samtools );
+my ( $samtools ) = map{chomp; $_}`which samtools`;
 ( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
 
 # Check for missing or crappy arguments

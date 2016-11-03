@@ -12,14 +12,16 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
+my ( $vep_path, $vep_data, $vep_forks ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4 );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7 );
 my $perl_bin = $Config{perlpath};
 
-# Find out if samtools is properly installed, and warn the user if it's not
-my $samtools = `which samtools`;
-chomp( $samtools );
+# Find out if samtools and tabix are properly installed, and warn the user if it's not
+my ( $samtools ) = map{chomp; $_}`which samtools`;
 ( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
+my ( $tabix ) = map{chomp; $_}`which tabix`;
+( $tabix and -e $tabix ) or die "ERROR: Please install tabix, and make sure it's in your PATH\n";
 
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
@@ -209,7 +211,8 @@ GetOptions(
     'maf-center=s' => \$maf_center,
     'retain-info=s' => \$retain_info,
     'min-hom-vaf=s' => \$min_hom_vaf,
-    'remap-chain=s' => \$remap_chain
+    'remap-chain=s' => \$remap_chain,
+    'filter-vcf=s' => \$filter_vcf
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -218,6 +221,7 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 ( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
 ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
 ( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
+( -s $filter_vcf ) or die "ERROR: Provided ExAC VCF is missing or empty!\nPath: $filter_vcf\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
@@ -283,9 +287,10 @@ if( $remap_chain ) {
     $input_vcf = "$tmp_dir/$input_name.remap.vcf";
 }
 
-# Before running annotation, let's pull flanking bps for each variant to do some checks
+# Before running annotation, let's pull flanking reference bps for each variant to do some checks,
+# and we'll also pull out overlapping calls from the filter VCF
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
-my ( %ref_bps, @ref_loci, %flanking_bps, %uniq_regions );
+my ( %ref_bps, @ref_loci, %uniq_regions, %flanking_bps, %filter_data );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
@@ -299,8 +304,8 @@ while( my $line = $vcf_fh->getline ) {
 }
 $vcf_fh->close;
 
-# samtools runs faster when passed many loci at a time, but limited to around 125k args at least on
-# CentOS6. If there are too many loci, let's split them into 100k chunks and run separately
+# samtools runs faster when passed many loci at a time, but limited to around 125k args, at least
+# on CentOS 6. If there are too many loci, split them into 100k chunks and run separately
 my ( @regions_split, $lines );
 my @regions = keys %uniq_regions;
 push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
@@ -316,6 +321,19 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
     else {
         warn "WARNING: Unable to retrieve bps for $locus from $ref_fasta\n";
     }
+}
+
+# Query those same regions on the filter VCF, using tabix, just like we used samtools above
+$lines = "";
+map{ my $loci = join( " ", @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
+foreach my $line ( split( "\n", $lines )) {
+    my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
+    # Parse out data in the info column, and store it for later, along with REF, ALT, and FILTER
+    my $locus = "$chr:$pos";
+    %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
+    $filter_data{$locus}{REF} = $ref;
+    $filter_data{$locus}{ALT} = $alt;
+    $filter_data{$locus}{FILTER} = $filter;
 }
 
 # For each variant locus and reference allele in the input VCF, report any problems
@@ -342,7 +360,6 @@ unless( -s $output_vcf ) {
     warn "STATUS: Running VEP and writing to: $output_vcf\n";
     # Make sure we can find the VEP script and the reference FASTA
     ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
-    ( -s $ref_fasta ) or die "ERROR: Reference FASTA not found: $ref_fasta\n";
 
     # Contruct VEP command using some default options and run it
     my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
@@ -354,8 +371,6 @@ unless( -s $output_vcf ) {
     $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
     # Add options that work for most species, except a few we know about
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
-    # Add options that only work on human variants mapped to the GRCh37 reference genome
-    $vep_cmd .= " --plugin ExAC,$vep_data/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" if( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" );
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
@@ -381,7 +396,10 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS GMAF AFR_MAF AMR_MAF ASN_MAF EAS_MAF EUR_MAF SAS_MAF AA_MAF EA_MAF CLIN_SIG
     SOMATIC PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
-    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual ExAC_AF_Adj );
+    ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual
+    ExAC_AF_Adj ExAC_AC_AN_Adj ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS
+    ExAC_AC_AN_FIN ExAC_AC_AN_NFE ExAC_AC_AN_OTH ExAC_AC_AN_SAS );
+
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -508,8 +526,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Figure out the appropriate start/stop loci and variant type/allele to report in the MAF
     my $start = my $stop = my $var_type = my $inframe = "";
     my ( $ref_length, $var_length ) = ( length( $ref ), length( $var ));
-    # Backup the position and reference allele from the VCF, so we can use it to fetch flanking_bps
-    my ( $vcf_pos, $vcf_ref ) = ( $pos, $ref );
+    # Backup the VCF-style position and REF/ALT alleles, so we can use it later
+    my ( $vcf_pos, $vcf_ref, $vcf_var ) = ( $pos, $ref, $var );
     # Remove any prefixed reference bps from all alleles, using "-" for simple indels
     while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
         ( $ref, $var, @alleles ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var, @alleles );
@@ -689,19 +707,57 @@ while( my $line = $annotated_vcf_fh->getline ) {
         $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $gene_name and $effect_type and $transcript_id );
     }
 
+    # If this variant was seen in the ExAC VCF, let's report allele counts and frequencies
+    # ExAC merges and pads multiallelic sites, so we need to normalize each variant, (remove common
+    # suffixed bps) before we compare it to our variant allele
+    my $locus = "$chrom:$vcf_pos";
+    if( defined $filter_data{$locus} ) {
+        my $idx = 0;
+        foreach my $f_var ( split( ",", $filter_data{$locus}{ALT} )) {
+            my $f_ref = $filter_data{$locus}{REF};
+            # De-pad suffixed bps that are identical between ref/var alleles
+            while( $f_ref and $f_var and substr( $f_ref, -1, 1 ) eq substr( $f_var, -1, 1 ) and $f_ref ne $f_var ) {
+                ( $f_ref, $f_var ) = map{substr( $_, 0, -1 )} ( $f_ref, $f_var );
+            }
+            # If this normalized variant matches our input variant, report its allele counts
+            # ExAC reports MNPs as separate SNPs. So we'll need to report the ACs of the first SNP
+            if(( $vcf_ref eq $f_ref and $vcf_var eq $f_var ) or
+              (( $var_type eq "DNP" or $var_type eq "TNP" or $var_type eq "ONP") and
+               ( $vcf_ref =~ m/^$f_ref/ and $vcf_var =~ m/^$f_var/ ))) {
+                my @var_acs = split( ",", $filter_data{$locus}{AC} );
+                my $var_ac = $var_acs[$idx];
+                my $pop_an = $filter_data{$locus}{AN};
+                $maf_line{ExAC_AF} = sprintf( "%.4g", ( $pop_an ? ( $var_ac / $pop_an ) : 0 ));
+                $maf_line{ExAC_AC_AN} = join( "/", $var_ac, $pop_an );
+                # Do the same for AC/AN in each subpopulation, and the adjusted total AC/AN (Adj)
+                foreach my $subpop ( qw( AFR AMR EAS FIN NFE OTH SAS Adj )) {
+                    @var_acs = split( ",", $filter_data{$locus}{"AC_$subpop"} );
+                    $var_ac = $var_acs[$idx];
+                    $pop_an = $filter_data{$locus}{"AN_$subpop"};
+                    $maf_line{"ExAC_AF_$subpop"} = sprintf( "%.4g", ( $pop_an ? ( $var_ac / $pop_an ) : 0 ));
+                    $maf_line{"ExAC_AC_AN_$subpop"} = join( "/", $var_ac, $pop_an );
+                }
+                last;
+            }
+            ++$idx;
+        }
+    }
+
     # Apply FILTER from the input VCF, and also tag calls with high minor allele frequency in
     # any ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
     my ( $max_subpop_maf, $subpop_count ) = ( 0.0004, 0 );
+    # Remove existing common_variant tags from input, so it's redefined by our criteria here
+    $filter = join( ",", grep{ $_ ne "common_variant" } split( ",", $filter ));
     foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_SAS )) {
         $subpop_count++ if( $maf_line{$subpop} ne "" and $maf_line{$subpop} > $max_subpop_maf );
     }
     if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic|risk_factor|protective/ ) {
-        $filter = (( $filter eq "PASS" or $filter eq "." ) ? "common_variant" : "$filter,common_variant" );
+        $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter,common_variant" );
     }
     $maf_line{FILTER} = $filter;
 
     # Also add the reference allele flanking bps that we generated earlier with samtools
-    my $locus = "$chrom:" . ( $vcf_pos - 1 ) . "-" . ( $vcf_pos + length( $vcf_ref ));
+    $locus = "$chrom:" . ( $vcf_pos - 1 ) . "-" . ( $vcf_pos + length( $vcf_ref ));
     $maf_line{flanking_bps} = $flanking_bps{$locus};
 
     # Add ID and QUAL from the input VCF into respective MAF columns
@@ -864,6 +920,7 @@ __DATA__
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --filter-vcf     The non-TCGA VCF from exac.broadinstitute.org [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 86) [Default: Installed version]
