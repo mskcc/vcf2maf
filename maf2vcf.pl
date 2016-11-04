@@ -107,13 +107,10 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
         $bps = uc( $bps );
         $flanking_bps{$locus} = $bps;
     }
-    else {
-        warn "WARNING: Unable to retrieve bps for $locus from $ref_fasta\n";
-    }
 }
 
-# If samtools failed to run, and we were unable to gather any flanking_bps, quit with an error
-( %flanking_bps ) or die "ERROR: Couldn't run samtools to grab reference bps from FASTA\n";
+# If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
+( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your MAF: $ref_fasta\n";
 
 # Parse through each variant in the MAF, and fill up the respective per-sample VCFs
 $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";

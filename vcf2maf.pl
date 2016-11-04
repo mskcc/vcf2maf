@@ -308,6 +308,7 @@ $vcf_fh->close;
 # on CentOS 6. If there are too many loci, split them into 100k chunks and run separately
 my ( @regions_split, $lines );
 my @regions = keys %uniq_regions;
+my $chr_prefix_in_use = ( $regions[0] =~ m/^chr/ ? 1 : 0 );
 push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
 map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
@@ -318,18 +319,19 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
         $bps = uc( $bps );
         $flanking_bps{$locus} = $bps;
     }
-    else {
-        warn "WARNING: Unable to retrieve bps for $locus from $ref_fasta\n";
-    }
 }
+
+# If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
+( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your VCF: $ref_fasta\n";
 
 # Query those same regions on the filter VCF, using tabix, just like we used samtools above
 $lines = "";
-map{ my $loci = join( " ", @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
+# ::NOTE:: chr-prefix removal works safely here because ExAC is limited to 1..22, X, Y
+map{ my $loci = join( " ", map{s/^chr//; $_} @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
 foreach my $line ( split( "\n", $lines )) {
     my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
     # Parse out data in the info column, and store it for later, along with REF, ALT, and FILTER
-    my $locus = "$chr:$pos";
+    my $locus = ( $chr_prefix_in_use ? "chr$chr:$pos" : "$chr:$pos" );
     %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
     $filter_data{$locus}{REF} = $ref;
     $filter_data{$locus}{ALT} = $alt;
