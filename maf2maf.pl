@@ -41,7 +41,7 @@ my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id 
     MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH
     ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual ExAC_AF_Adj ExAC_AC_AN_Adj
     ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS ExAC_AC_AN_FIN ExAC_AC_AN_NFE
-    ExAC_AC_AN_OTH ExAC_AC_AN_SAS );
+    ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER );
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {

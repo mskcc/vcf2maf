@@ -104,6 +104,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 120. ExAC_AC_AN_NFE - Non-Finnish European Allele Count and Number from ExAC
 121. ExAC_AC_AN_OTH - Other Allele Count and Number from ExAC
 122. ExAC_AC_AN_SAS - South Asian Allele Count and Number from ExAC
+123. ExAC_FILTER - FILTER tags retrieved from ExAC VCF; PASS means ExAC thinks it's germline
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 

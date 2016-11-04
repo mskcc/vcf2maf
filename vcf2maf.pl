@@ -14,7 +14,7 @@ use Config;
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7, 16 );
 my $perl_bin = $Config{perlpath};
 
 # Find out if samtools and tabix are properly installed, and warn the user if it's not
@@ -212,7 +212,8 @@ GetOptions(
     'retain-info=s' => \$retain_info,
     'min-hom-vaf=s' => \$min_hom_vaf,
     'remap-chain=s' => \$remap_chain,
-    'filter-vcf=s' => \$filter_vcf
+    'filter-vcf=s' => \$filter_vcf,
+    'max-filter-ac=i' => \$max_filter_ac
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -400,7 +401,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     TSL HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN
     ExAC_AF_NFE ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual
     ExAC_AF_Adj ExAC_AC_AN_Adj ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS
-    ExAC_AC_AN_FIN ExAC_AC_AN_NFE ExAC_AC_AN_OTH ExAC_AC_AN_SAS );
+    ExAC_AC_AN_FIN ExAC_AC_AN_NFE ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER );
 
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
@@ -715,6 +716,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     my $locus = "$chrom:$vcf_pos";
     if( defined $filter_data{$locus} ) {
         my $idx = 0;
+        $maf_line{ExAC_FILTER} = $filter_data{$locus}{FILTER};
         foreach my $f_var ( split( ",", $filter_data{$locus}{ALT} )) {
             my $f_ref = $filter_data{$locus}{REF};
             # De-pad suffixed bps that are identical between ref/var alleles
@@ -745,15 +747,18 @@ while( my $line = $annotated_vcf_fh->getline ) {
         }
     }
 
-    # Apply FILTER from the input VCF, and also tag calls with high minor allele frequency in
-    # any ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective
-    my ( $max_subpop_maf, $subpop_count ) = ( 0.0004, 0 );
+    # Copy the FILTER from the input VCF, and also tag calls with high minor allele counts in any
+    # ExAC subpopulation, unless ClinVar says pathogenic or likely_pathogenic
+    my $subpop_count = 0;
     # Remove existing common_variant tags from input, so it's redefined by our criteria here
     $filter = join( ",", grep{ $_ ne "common_variant" } split( ",", $filter ));
-    foreach my $subpop ( qw( ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_SAS )) {
-        $subpop_count++ if( $maf_line{$subpop} ne "" and $maf_line{$subpop} > $max_subpop_maf );
+    foreach my $subpop ( qw( AFR AMR EAS FIN NFE OTH SAS )) {
+        if( $maf_line{"ExAC_AC_AN_$subpop"} ) {
+            my ( $subpop_ac ) = split( "/", $maf_line{"ExAC_AC_AN_$subpop"} );
+            $subpop_count++ if( $subpop_ac > $max_filter_ac );
+        }
     }
-    if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic|risk_factor|protective/ ) {
+    if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic/ ) {
         $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter,common_variant" );
     }
     $maf_line{FILTER} = $filter;
@@ -923,6 +928,7 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --filter-vcf     The non-TCGA VCF from exac.broadinstitute.org [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
+ --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [16]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 86) [Default: Installed version]
