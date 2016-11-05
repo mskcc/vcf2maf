@@ -32,7 +32,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 48. Gene - stable Ensembl ID of affected gene
 49. Feature - stable Ensembl ID of feature
 50. Feature_type - type of feature. Currently one of Transcript, RegulatoryFeature, MotifFeature
-51. Consequence - consequence type of this variation
+51. Consequence - consequence type of this variation; comma-delimited if more than one
 52. cDNA_position - relative position of base pair in cDNA sequence
 53. CDS_position - relative position of base pair in coding sequence
 54. Protein_position - relative position of amino acid in protein
@@ -46,8 +46,8 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 62. SYMBOL_SOURCE - the source of the gene symbol
 63. HGNC_ID - gene identifier from the HUGO Gene Nomenclature Committee
 64. BIOTYPE - biotype of transcript
-65. CANONICAL - a flag indicating if the transcript is denoted as the canonical transcript for this gene
-66. CCDS - the CCDS identifer for this transcript, where applicable
+65. CANONICAL - a flag indicating that the VEP-based canonical transcript was used for this gene
+66. CCDS - the CCDS identifier for this transcript, where applicable
 67. ENSP - the Ensembl protein identifier of the affected transcript
 68. SWISSPROT - UniProtKB/Swiss-Prot accession
 69. TREMBL - UniProtKB/TrEMBL identifier of protein product
@@ -57,7 +57,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 73. PolyPhen - the PolyPhen prediction and/or score
 74. EXON - the exon number (out of total number)
 75. INTRON - the intron number (out of total number)
-76. DOMAINS - the source and identifer of any overlapping protein domains
+76. DOMAINS - the source and identifier of any overlapping protein domains
 77. GMAF - Non-reference allele and frequency of existing variant in 1000 Genomes
 78. AFR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined African population
 79. AMR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined American population
@@ -68,7 +68,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 84. AA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP African American population
 85. EA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP European American population
 86. CLIN_SIG - clinical significance of variant from dbSNP
-87. SOMATIC - somatic status of IDs reported under Existing_variation
+87. SOMATIC - somatic status of each ID reported under Existing_variation
 88. PUBMED - pubmed ID(s) of publications that cite existing variant
 89. MOTIF_NAME - the source and identifier of a transcription factor binding profile aligned at this position
 90. MOTIF_POS - the relative position of the variation in the aligned TFBP
@@ -90,7 +90,7 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 106. ExAC_AF_OTH - Other Allele Frequency from ExAC
 107. ExAC_AF_SAS - South Asian Allele Frequency from ExAC
 108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
-109. FILTER - False-positive filtering status, borrowed from the input MAF/VCF, and then tags ExAC "common_variants"
+109. FILTER - Copied from input MAF/VCF, with ExAC-based common_variant tag added, as explained below
 110. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
 111. variant_id - The ID from an input VCF, or the variant_id from an input MAF
 112. variant_qual - The QUAL from an input VCF, or the variant_qual from an input MAF
@@ -108,15 +108,28 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 
-51. Consequence - consequence type of this variation as defined at http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
-86. CLIN_SIG - clinical significance of variant from dbSNP (http://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/) Grep for tags like pathogenic or drug_response
+51. Consequence - consequence of this variant (http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences).
+      This may contain multiple terms that are comma-separated. For example, a synonymous mutation might be close enough to an intron
+      to alter splicing. VEP will report both "synonymous_variant" and "splice_region_variant" in this column, for such variants.
+93. IMPACT - the severity of the consequence (http://useast.ensembl.org/Help/Glossary?id=535). "HIGH" means severe effect on gene.
+86. CLIN_SIG - clinical significance of variant per ClinVar (http://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/). Find important
+      variants by looking for tags like pathogenic, likely_pathogenic, or drug_response.
 88. PUBMED - pubmed ID(s) of publications that cite existing variant. Some of these pubs are crap, but a few are gold mines.
-93. IMPACT - the impact modifier for the consequence type (http://useast.ensembl.org/Help/Glossary?id=535) "HIGH" means important.
 
 These are some other columns to help shortlist variants worth looking into:
 
-57. Existing_variation - known identifier of existing variation (if the variant was seen in some other somatic/germline DB, it's ID will be listed here)
-72. SIFT - the SIFT prediction and/or score, with both given as prediction (score)
-73. PolyPhen - the PolyPhen prediction and/or score
-109. FILTER - False-positive filtering status, borrowed from the input MAF/VCF. A tag named common_variant is also appended, if minor allele freq is >0.0004 in any ExAC subpopulation, unless ClinVar says pathogenic, risk_factor, or protective. This means the variant is likely a false-positive somatic call at a germline or artifactual position.
-113. ExAC_AF_Adj - Global allele frequency across the ExAC population, adjusted for samples where this position could be genotyped with high quality. If you're studying germline variants, then this tells you how common or rare the variant is.
+57. Existing_variation - known identifier of existing variation. If the variant was seen in some
+      other somatic/germline DB, its ID will be listed here.
+72. SIFT - the SIFT prediction and/or score, with both given as prediction (score).
+73. PolyPhen - the PolyPhen prediction and/or score.
+109. FILTER - False-positive filtering status, copied from the input MAF/VCF. An additional filter
+      named common_variant is also appended, if allele count across at least one ExAC subpopulation
+      is >16, and ClinVar doesn't say it's pathogenic. So if you're handling somatic variants, the
+      common_variant tag means this is likely to be a false-positive. Though unlikely, it could
+      also be a legitimate somatic variant in your specific sample, but ExAC classifies it as
+      germline or artifact per the normal DNA of at least 8 non-TCGA individuals (16 alleles).
+123. ExAC_FILTER - FILTER tags copied from the ExAC VCF. Differentiates between what ExAC classifies
+      as germline (tagged as "PASS") or artifact (one or more tags, but not "PASS").
+113. ExAC_AF_Adj - Global allele frequency across the ExAC population, adjusted for samples where
+      this position could be genotyped at high quality. If you're handling germline variants, then
+      this tells you how common or rare the variant is.
