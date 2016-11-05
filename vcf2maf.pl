@@ -325,6 +325,9 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
 ( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your VCF: $ref_fasta\n";
 
+# Warn the user if they're about to use the ExAC VCF to filter non-GRCh37 variants
+( $ncbi_build eq "GRCh37" or $filter_vcf !~ m/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz$/ ) or warn "WARNING: Running VEP with $ncbi_build, but the filter-vcf is GRCh37: $filter_vcf";
+
 # Query those same regions on the filter VCF, using tabix, just like we used samtools above
 $lines = "";
 # ::NOTE:: chr-prefix removal works safely here because ExAC is limited to 1..22, X, Y
