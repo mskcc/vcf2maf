@@ -45,7 +45,7 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Check if required arguments are missing or problematic, fix as needed
 ( defined $input_maf and defined $output_dir ) or die "ERROR: --input-maf and --output-dir must be defined!\n";
-( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
+( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
 unless( defined $output_vcf ) {
     $output_vcf = "$output_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
     $output_vcf =~ s/(\.)?(maf|tsv|txt)?$/.vcf/;

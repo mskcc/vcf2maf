@@ -15,9 +15,9 @@ use Config;
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
-my ( $vep_path, $vep_data, $vep_forks, $ref_fasta ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4,
-    "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7 );
+my ( $vep_path, $vep_data, $vep_forks ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4 );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7, 16 );
 my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
@@ -71,7 +71,9 @@ GetOptions(
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
     'cache-version=s' => \$cache_version,
-    'ref-fasta=s' => \$ref_fasta
+    'ref-fasta=s' => \$ref_fasta,
+    'filter-vcf=s' => \$filter_vcf,
+    'max-filter-ac=i' => \$max_filter_ac
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -82,6 +84,13 @@ $script_dir = "." unless( $script_dir );
 my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/vcf2maf.pl" );
 ( -s $maf2vcf_path ) or die "ERROR: Couldn't locate maf2vcf.pl! Must be beside maf2maf.pl\n";
 ( -s $vcf2maf_path ) or die "ERROR: Couldn't locate vcf2maf.pl! Must be beside maf2maf.pl\n";
+
+# Check if required arguments are missing or problematic
+( defined $input_maf ) or die "ERROR: --input-maf must be defined!\n";
+( -s $input_maf ) or die "ERROR: Provided MAF file is missing or empty! Path: $input_maf\n";
+( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
+( -s $filter_vcf ) or die "ERROR: Provided ExAC VCF is missing or empty! Path: $filter_vcf\n";
+( $input_maf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary MAFs are not supported\n";
 
 # Create a temporary directory for our intermediate files, unless the user wants to use their own
 if( $tmp_dir ) {
@@ -96,7 +105,7 @@ my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $
     "--ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
     "--tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col ".
     "--nrm-vad-col $nrm_vad_col --per-tn-vcfs";
-system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf!\nCommand: $maf2vcf_cmd\n";
+system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf! Command: $maf2vcf_cmd\n";
 
 my $vcf_file = "$tmp_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
 $vcf_file =~ s/(\.)?(maf|tsv|txt)?$/.vcf/;
@@ -111,7 +120,6 @@ else {
     warn "STATUS: Running VEP and writing to: $vep_anno\n";
     # Make sure we can find the VEP script and the reference FASTA
     ( -s "$vep_path/variant_effect_predictor.pl" ) or die "ERROR: Cannot find VEP script variant_effect_predictor.pl in path: $vep_path\n";
-    ( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
 
     # Contruct VEP command using some default options and run it
     my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $vcf_file --output_file $vep_anno";
@@ -125,8 +133,8 @@ else {
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
 
     # Make sure it ran without error codes
-    system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $vep_anno\n";
+    system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
+    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty! Path: $vep_anno\n";
 }
 
 # Load the tumor-normal pairs from the TSV created by maf2vcf
@@ -210,11 +218,12 @@ foreach my $tn_vcf ( @vcfs ) {
     my ( $tumor_id, $normal_id ) = $tn_vcf=~m/^.*\/(.*)_vs_(.*)\.vcf/;
     my $tn_maf = $tn_vcf;
     $tn_maf =~ s/.vcf$/.vep.maf/;
-    my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf " .
-        "--tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data " .
-        "--vep-forks $vep_forks --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species";
+    my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf" .
+        " --tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data" .
+        " --vep-forks $vep_forks --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species" .
+        " --filter-vcf $filter_vcf --max-filter-ac $max_filter_ac";
     $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
-    system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf!\nCommand: $vcf2maf_cmd\n";
+    system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf! Command: $vcf2maf_cmd\n";
 }
 
 # Fetch the column header from one of the resulting MAFs
@@ -361,6 +370,8 @@ __DATA__
  --vep-path       Folder containing variant_effect_predictor.pl [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
+ --filter-vcf     The non-TCGA VCF from exac.broadinstitute.org [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
+ --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [16]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 82, 86) [Default: Installed version]
@@ -371,6 +382,14 @@ __DATA__
 =head1 DESCRIPTION
 
 This script runs a given MAF through maf2vcf to generate per-TN-pair VCFs in a temporary folder, and then runs vcf2maf on each VCF to reannotate variant effects and create a new combined MAF
+
+=head2 Relevant links:
+
+ Homepage: https://github.com/ckandoth/vcf2maf
+ VCF format: http://samtools.github.io/hts-specs/
+ MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
+ VEP: http://ensembl.org/info/docs/tools/vep/index.html
+ VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
 
 =head1 AUTHORS
 

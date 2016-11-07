@@ -220,9 +220,9 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Check if required arguments are missing or problematic
 ( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
-( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty!\nPath: $input_vcf\n";
-( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty!\nPath: $ref_fasta\n";
-( -s $filter_vcf ) or die "ERROR: Provided ExAC VCF is missing or empty!\nPath: $filter_vcf\n";
+( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty! Path: $input_vcf\n";
+( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
+( -s $filter_vcf ) or die "ERROR: Provided ExAC VCF is missing or empty! Path: $filter_vcf\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
@@ -232,7 +232,7 @@ $vcf_normal_id = $normal_id unless( $vcf_normal_id );
 # Load up the custom isoform overrides if provided:
 my %custom_enst;
 if( $custom_enst_file ) {
-    ( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty!\nPath: $custom_enst_file\n";
+    ( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty! Path: $custom_enst_file\n";
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
@@ -379,8 +379,8 @@ unless( -s $output_vcf ) {
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
 
     # Make sure it ran without error codes
-    system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator!\nCommand: $vep_cmd\n";
-    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty!\nPath: $output_vcf\n";
+    system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
+    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty! Path: $output_vcf\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
