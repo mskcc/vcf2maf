@@ -222,7 +222,6 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 ( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
 ( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty! Path: $input_vcf\n";
 ( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
-( -s $filter_vcf ) or die "ERROR: Provided ExAC VCF is missing or empty! Path: $filter_vcf\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
@@ -291,71 +290,75 @@ if( $remap_chain ) {
 # Before running annotation, let's pull flanking reference bps for each variant to do some checks,
 # and we'll also pull out overlapping calls from the filter VCF
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
-my ( %ref_bps, @ref_loci, %uniq_regions, %flanking_bps, %filter_data );
+my ( %ref_bps, @ref_regions, %uniq_loci, %uniq_regions, %flanking_bps, %filter_data );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
     chomp( $line );
     my ( $chr, $pos, undef, $ref ) = split( "\t", $line );
-    # Create a locus that spans the length of the reference allele and 1bp flanks around it
+    # Create a region that spans the length of the reference allele and 1bp flanks around it
     my $region = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
     $ref_bps{$region} = $ref;
-    push( @ref_loci, $region );
+    push( @ref_regions, $region );
     $uniq_regions{$region} = 1;
+    $uniq_loci{"$chr:$pos-$pos"} = 1;
 }
 $vcf_fh->close;
 
 # samtools runs faster when passed many loci at a time, but limited to around 125k args, at least
 # on CentOS 6. If there are too many loci, split them into 100k chunks and run separately
-my ( @regions_split, $lines );
+my ( $lines, @regions_split );
 my @regions = keys %uniq_regions;
 my $chr_prefix_in_use = ( $regions[0] =~ m/^chr/ ? 1 : 0 );
 push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
-map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
+map{ my $region = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $region` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
-    my ( $locus, $bps ) = split( "\n", $line, 2 );
+    my ( $region, $bps ) = split( "\n", $line, 2 );
     $bps =~ s/\r|\n//g;
     if( $bps ){
         $bps = uc( $bps );
-        $flanking_bps{$locus} = $bps;
+        $flanking_bps{$region} = $bps;
     }
 }
 
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
 ( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your VCF: $ref_fasta\n";
 
-# Warn the user if they're about to use the ExAC VCF to filter non-GRCh37 variants
-( $ncbi_build eq "GRCh37" or $filter_vcf !~ m/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz$/ ) or warn "WARNING: Running VEP with $ncbi_build, but the filter-vcf is GRCh37: $filter_vcf";
-
-# Query those same regions on the filter VCF, using tabix, just like we used samtools above
-$lines = "";
-# ::NOTE:: chr-prefix removal works safely here because ExAC is limited to 1..22, X, Y
-map{ my $loci = join( " ", map{s/^chr//; $_} @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
-foreach my $line ( split( "\n", $lines )) {
-    my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
-    # Parse out data in the info column, and store it for later, along with REF, ALT, and FILTER
-    my $locus = ( $chr_prefix_in_use ? "chr$chr:$pos" : "$chr:$pos" );
-    %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
-    $filter_data{$locus}{REF} = $ref;
-    $filter_data{$locus}{ALT} = $alt;
-    $filter_data{$locus}{FILTER} = $filter;
+# Skip filtering if not handling GRCh37, and filter-vcf is pointing to the default GRCh37 ExAC VCF
+if( $ncbi_build eq "GRCh37" or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" )) {
+    ( $filter_vcf and -s $filter_vcf ) or die "ERROR: Provided filter-vcf is missing or empty! Path: $filter_vcf\n";
+    # Query each variant locus on the filter VCF, using tabix, just like we used samtools earlier
+    ( $lines, @regions_split ) = ( "", ());
+    my @regions = keys %uniq_loci;
+    push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
+    # ::NOTE:: chr-prefix removal works safely here because ExAC is limited to 1..22, X, Y
+    map{ my $loci = join( " ", map{s/^chr//; $_} @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
+    foreach my $line ( split( "\n", $lines )) {
+        my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
+        # Parse out data in the info column, and store it for later, along with REF, ALT, and FILTER
+        my $locus = ( $chr_prefix_in_use ? "chr$chr:$pos" : "$chr:$pos" );
+        %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
+        $filter_data{$locus}{REF} = $ref;
+        $filter_data{$locus}{ALT} = $alt;
+        $filter_data{$locus}{FILTER} = $filter;
+    }
 }
 
 # For each variant locus and reference allele in the input VCF, report any problems
-foreach my $ref_locus ( @ref_loci ) {
-    my $ref = $ref_bps{$ref_locus};
-    my ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $ref_locus );
-    if( !defined $flanking_bps{$ref_locus} ) {
+foreach my $region ( @ref_regions ) {
+    my $ref = $ref_bps{$region};
+    my ( $locus ) = map{ my ( $chr, $pos ) = split( ":" ); ++$pos; "$chr:$pos" } split( "-", $region );
+    if( !defined $flanking_bps{$region} ) {
         warn "WARNING: Couldn't retrieve bps around $locus from reference FASTA: $ref_fasta\n";
     }
-    elsif( $flanking_bps{$ref_locus} !~ m/^[ACGTN]+$/ ) {
-        warn "WARNING: Retrieved invalid bps " . $flanking_bps{$ref_locus} . " around $locus from reference FASTA: $ref_fasta\n";
+    elsif( $flanking_bps{$region} !~ m/^[ACGTN]+$/ ) {
+        warn "WARNING: Retrieved invalid bps " . $flanking_bps{$region} . " around $locus from reference FASTA: $ref_fasta\n";
     }
-    elsif( $ref ne substr( $flanking_bps{$ref_locus}, 1, length( $ref ))) {
+    elsif( $ref ne substr( $flanking_bps{$region}, 1, length( $ref ))) {
         warn "WARNING: Reference allele $ref at $locus doesn't match " .
-            substr( $flanking_bps{$ref_locus}, 1, length( $ref )) . " (flanking bps: " .
-            $flanking_bps{$ref_locus} . ") from reference FASTA: $ref_fasta\n";
+            substr( $flanking_bps{$region}, 1, length( $ref )) . " (flanking bps: " .
+            $flanking_bps{$region} . ") from reference FASTA: $ref_fasta\n";
     }
 }
 
@@ -767,8 +770,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{FILTER} = $filter;
 
     # Also add the reference allele flanking bps that we generated earlier with samtools
-    $locus = "$chrom:" . ( $vcf_pos - 1 ) . "-" . ( $vcf_pos + length( $vcf_ref ));
-    $maf_line{flanking_bps} = $flanking_bps{$locus};
+    my $region = "$chrom:" . ( $vcf_pos - 1 ) . "-" . ( $vcf_pos + length( $vcf_ref ));
+    $maf_line{flanking_bps} = $flanking_bps{$region};
 
     # Add ID and QUAL from the input VCF into respective MAF columns
     $maf_line{variant_id} = $var_id;
