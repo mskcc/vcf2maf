@@ -87,9 +87,9 @@ my ( $maf2vcf_path, $vcf2maf_path ) = ( "$script_dir/maf2vcf.pl", "$script_dir/v
 
 # Check if required arguments are missing or problematic
 ( defined $input_maf ) or die "ERROR: --input-maf must be defined!\n";
-( -s $input_maf ) or die "ERROR: Provided MAF file is missing or empty! Path: $input_maf\n";
-( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
-( $input_maf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary MAFs are not supported\n";
+( -s $input_maf ) or die "ERROR: Provided --input-maf is missing or empty: $input_maf\n";
+( -s $ref_fasta ) or die "ERROR: Provided --ref-fasta is missing or empty: $ref_fasta\n";
+( $input_maf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Unfortunately, --input-maf cannot be in a compressed format\n";
 
 # Create a temporary directory for our intermediate files, unless the user wants to use their own
 if( $tmp_dir ) {
@@ -133,7 +133,7 @@ else {
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
-    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty! Path: $vep_anno\n";
+    ( -s $vep_anno ) or warn "WARNING: VEP-annotated VCF file is missing or empty: $vep_anno\n";
 }
 
 # Load the tumor-normal pairs from the TSV created by maf2vcf
@@ -235,7 +235,7 @@ my %input_maf_data = ();
 if( $retain_cols ) {
 
     # Parse the input MAF and fetch the data for columns that we need to retain/override
-    my $input_maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
+    my $input_maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open --input-maf\n";
     my %input_maf_col_idx = (); # Hash to map column names to column indexes
     while( my $line = $input_maf_fh->getline ) {
 
@@ -333,7 +333,7 @@ if( $retain_cols ) {
 # Default to printing to screen if an output MAF was not defined
 my $maf_fh = *STDOUT;
 if( $output_maf ) {
-    $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open file: $output_maf\n";
+    $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open --output-maf\n";
 }
 $maf_fh->print( "#version 2.4\n$maf_header\n" );
 foreach my $tn_maf ( @mafs ) {

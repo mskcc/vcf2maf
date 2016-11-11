@@ -8,7 +8,7 @@ To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wi
 Quick start
 -----------
 
-Find the [latest stable release](https://github.com/mskcc/vcf2maf/releases), and view the detailed usage manuals for `vcf2maf` and `maf2maf`:
+Find the [latest stable release](https://github.com/mskcc/vcf2maf/releases), download it, and view the detailed usage manuals for `vcf2maf` and `maf2maf`:
 
     export VCF2MAF_URL=`curl -sL https://api.github.com/repos/mskcc/vcf2maf/releases | grep -m1 tarball_url | cut -d\" -f4`
     curl -L -o mskcc-vcf2maf.tar.gz $VCF2MAF_URL; tar -zxf mskcc-vcf2maf.tar.gz; cd mskcc-vcf2maf-*

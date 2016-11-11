@@ -220,9 +220,9 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Check if required arguments are missing or problematic
 ( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
-( -s $input_vcf ) or die "ERROR: Provided VCF file is missing or empty! Path: $input_vcf\n";
-( -s $ref_fasta ) or die "ERROR: Provided Reference FASTA is missing or empty! Path: $ref_fasta\n";
-( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Compressed or binary VCFs are not supported\n";
+( -s $input_vcf ) or die "ERROR: Provided --input-vcf is missing or empty: $input_vcf\n";
+( -s $ref_fasta ) or die "ERROR: Provided --ref-fasta is missing or empty: $ref_fasta\n";
+( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Unfortunately, --input-vcf cannot be in a compressed format\n";
 
 # Unless specified, assume that the VCF uses the same sample IDs that the MAF will contain
 $vcf_tumor_id = $tumor_id unless( $vcf_tumor_id );
@@ -231,7 +231,7 @@ $vcf_normal_id = $normal_id unless( $vcf_normal_id );
 # Load up the custom isoform overrides if provided:
 my %custom_enst;
 if( $custom_enst_file ) {
-    ( -s $custom_enst_file ) or die "ERROR: The provided custom ENST file is missing or empty! Path: $custom_enst_file\n";
+    ( -s $custom_enst_file ) or die "ERROR: Provided --custom-enst file is missing or empty: $custom_enst_file\n";
     %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
 }
 
@@ -263,7 +263,7 @@ if( $remap_chain ) {
     unlink( "$tmp_dir/$input_name.bed" );
 
     # Create a new VCF in the temp folder, with remapped loci on which we'll run annotation
-    my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
+    my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
     my $remap_vcf_fh = IO::File->new( "$tmp_dir/$input_name.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.remap.vcf!\n";
     while( my $line = $orig_vcf_fh->getline ) {
         if( $line =~ m/^#/ ) {
@@ -289,7 +289,7 @@ if( $remap_chain ) {
 
 # Before running annotation, let's pull flanking reference bps for each variant to do some checks,
 # and we'll also pull out overlapping calls from the filter VCF
-my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF: $input_vcf!\n";
+my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
 my ( %ref_bps, @ref_regions, %uniq_loci, %uniq_regions, %flanking_bps, %filter_data );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
@@ -323,11 +323,12 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 }
 
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
-( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your VCF: $ref_fasta\n";
+# Or it's also possible that an outdated samtools was unable to parse the gzipped FASTA files
+( %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
 
 # Skip filtering if not handling GRCh37, and filter-vcf is pointing to the default GRCh37 ExAC VCF
 if( $ncbi_build eq "GRCh37" or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" )) {
-    ( $filter_vcf and -s $filter_vcf ) or die "ERROR: Provided filter-vcf is missing or empty! Path: $filter_vcf\n";
+    ( $filter_vcf and -s $filter_vcf ) or die "ERROR: Provided --filter-vcf is missing or empty: $filter_vcf\n";
     # Query each variant locus on the filter VCF, using tabix, just like we used samtools earlier
     ( $lines, @regions_split ) = ( "", ());
     my @regions = keys %uniq_loci;
@@ -383,7 +384,7 @@ unless( -s $output_vcf ) {
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
-    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty! Path: $output_vcf\n";
+    ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty: $output_vcf\n";
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
@@ -434,7 +435,7 @@ if( -s $entrez_id_file ) {
 # Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
-$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open output file: $output_maf!\n" if( $output_maf );
+$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open --output-maf: $output_maf!\n" if( $output_maf );
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
 ( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
 my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
