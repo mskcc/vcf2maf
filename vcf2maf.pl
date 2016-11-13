@@ -307,9 +307,9 @@ $vcf_fh->close;
 
 # samtools runs faster when passed many loci at a time, but limited to around 125k args, at least
 # on CentOS 6. If there are too many loci, split them into 100k chunks and run separately
-my ( $lines, @regions_split );
+my ( $lines, @regions_split ) = ( "", ());
 my @regions = keys %uniq_regions;
-my $chr_prefix_in_use = ( $regions[0] =~ m/^chr/ ? 1 : 0 );
+my $chr_prefix_in_use = ( @regions and $regions[0] =~ m/^chr/ ? 1 : 0 );
 push( @regions_split, [ splice( @regions, 0, 100000 ) ] ) while @regions;
 map{ my $region = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $region` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
@@ -324,7 +324,8 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
 # Or it's also possible that an outdated samtools was unable to parse the gzipped FASTA files
-( %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
+# ::NOTE:: If input had no variants, don't break here, so we can continue to create an empty MAF
+( !@regions or %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
 
 # Skip filtering if not handling GRCh37, and filter-vcf is pointing to the default GRCh37 ExAC VCF
 if( $ncbi_build eq "GRCh37" or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" )) {
