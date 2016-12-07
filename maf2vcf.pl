@@ -63,7 +63,7 @@ while( my $line = $maf_fh->getline ) {
     my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
 
     # Parse the header line to map column names to their indexes
-    if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/ ) {
+    if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/i ) {
 
         # Fetch the column names and do some sanity checks (don't be case-sensitive)
         my $idx = 0;
@@ -75,7 +75,7 @@ while( my $line = $maf_fh->getline ) {
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
         my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
-        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`egrep -v "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
+        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`grep -Eiv "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
 
         # Quit if one of the TN barcodes are missing, or they contain characters not allowed in Unix filenames
         map{ ( !m/^\s*$|^#|\0|\// ) or die "ERROR: Invalid Tumor_Sample_Barcode in MAF: \"$_\"\n"} @tn_pair;
@@ -128,7 +128,7 @@ while( my $line = $maf_fh->getline ) {
     # Instead of a chomp, do a thorough removal of carriage returns, line feeds, and prefixed/suffixed whitespace
     my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
 
-    if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/ ) {
+    if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/i ) {
 
         unless( -e $output_dir ) { mkdir $output_dir or die "ERROR: Couldn't create directory $output_dir! $!"; }
 
@@ -208,9 +208,9 @@ while( my $line = $maf_fh->getline ) {
 
     # Except for MAF-format simple insertions, check ref alleles, and skip lines that mismatch
     my $locus = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
-    if( $ref ne "" ) {
-        my $ref_from_fasta = substr( $flanking_bps{$locus}, 1, -1 );
-        if( $ref ne $ref_from_fasta ) {
+    if( $ref ne "" or !defined $flanking_bps{$locus} ) {
+        my $ref_from_fasta = ( defined $flanking_bps{$locus} ? substr( $flanking_bps{$locus}, 1, -1 ) : "" );
+        if( $ref ne $ref_from_fasta or !defined $flanking_bps{$locus} ) {
             # Create the file for skipped variants, if it wasn't already
             unless( $skipped_fh ) {
                 my $skip_file = "$output_dir/" . substr( $input_maf, rindex( $input_maf, '/' ) + 1 );
@@ -283,6 +283,7 @@ while( my $line = $maf_fh->getline ) {
     $var_qual{ $key } = $qual;
 }
 $maf_fh->close;
+$skipped_fh->close if( $skipped_fh );
 
 # Write the cached contents of per-TN VCFs into files
 if( $per_tn_vcfs ) {

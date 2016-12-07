@@ -156,7 +156,7 @@ while( my $line = $vep_fh->getline ) {
     if( $line =~ m/^#CHROM/ ) {
 
         # Initialize VCF header and fill up %tn_pair for each tumor-normal pair
-        foreach ( `egrep -v ^# $tsv_file` ){
+        foreach ( `grep -Ev ^# $tsv_file` ){
             chomp;
             my @ids = split( "\t", $_ );
             $t_col_idx{ $ids[ 0 ] } = 1;
@@ -227,7 +227,7 @@ foreach my $tn_vcf ( @vcfs ) {
 
 # Fetch the column header from one of the resulting MAFs
 my @mafs = glob( "$tmp_dir/*.vep.maf" );
-my $maf_header = `grep ^Hugo_Symbol $mafs[0]`;
+my $maf_header = `grep ^Hugo_Symbol $mafs[0] | head -n1`;
 chomp( $maf_header );
 
 # If user wants to retain some columns from the input MAF, fetch those and override
@@ -245,7 +245,7 @@ if( $retain_cols ) {
         my @cols = map{s/^\s+|\s+$|\r|\n//g; $_} split( /\t/, $line );
 
         # Parse the header line to map column names to their indexes
-        if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/ ) {
+        if( $line =~ m/^(Hugo_Symbol|Chromosome|Tumor_Sample_Barcode)/i ) {
             my $idx = 0;
             map{ my $c = lc; $input_maf_col_idx{$c} = $idx; ++$idx } @cols;
 
@@ -337,7 +337,7 @@ if( $output_maf ) {
 }
 $maf_fh->print( "#version 2.4\n$maf_header\n" );
 foreach my $tn_maf ( @mafs ) {
-    my @maf_lines = `egrep -v "^#|^Hugo_Symbol" $tn_maf`;
+    my @maf_lines = `grep -Ev "^#|^Hugo_Symbol" $tn_maf`;
     $maf_fh->print( @maf_lines );
 }
 $maf_fh->close;
