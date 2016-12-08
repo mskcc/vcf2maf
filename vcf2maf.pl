@@ -755,8 +755,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         }
     }
 
-    # Copy the FILTER from the input VCF, and also tag calls with high minor allele counts in any
-    # ExAC subpopulation, unless ClinVar says pathogenic or likely_pathogenic
+    # Copy FILTER from input VCF, and tag calls with high allele counts in any ExAC subpopulation
     my $subpop_count = 0;
     # Remove existing common_variant tags from input, so it's redefined by our criteria here
     $filter = join( ",", grep{ $_ ne "common_variant" } split( ",", $filter ));
@@ -766,7 +765,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             $subpop_count++ if( $subpop_ac > $max_filter_ac );
         }
     }
-    if( $subpop_count > 0 and $maf_line{CLIN_SIG} !~ /pathogenic/ ) {
+    if( $subpop_count > 0 ) {
         $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter,common_variant" );
     }
     $maf_line{FILTER} = $filter;
