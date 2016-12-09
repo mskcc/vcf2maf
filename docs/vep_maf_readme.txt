@@ -124,7 +124,7 @@ These are some other columns to help shortlist variants worth looking into:
 73. PolyPhen - the PolyPhen prediction and/or score.
 109. FILTER - False-positive filtering status, copied from the input MAF/VCF. An additional filter
       named common_variant is also appended, if allele count across at least one ExAC subpopulation
-      is >16 (this default cutoff can be changed when running vcf2maf). So if you're handling
+      is >10 (this default cutoff can be changed when running vcf2maf). So if you're handling
       somatic variants, the common_variant tag means this is likely a false-positive. It is less
       likely to be a legit somatic variant at a site that ExAC classifies as germline or artifact.
 123. ExAC_FILTER - FILTER tags copied from the ExAC VCF. Differentiates between what ExAC classifies
