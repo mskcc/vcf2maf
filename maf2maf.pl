@@ -15,7 +15,7 @@ use Config;
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $check_allele ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0 );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
@@ -69,7 +69,7 @@ GetOptions(
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
     'buffer-size=i' => \$buffer_size,
-    'check-allele!' => \$check_allele,
+    'any-allele!' => \$any_allele,
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
     'cache-version=s' => \$cache_version,
@@ -126,15 +126,14 @@ else {
     my $vep_cmd = "$perl_bin $vep_path/variant_effect_predictor.pl --species $species --assembly $ncbi_build --offline --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --minimal --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $vcf_file --output_file $vep_anno";
     # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
-    # If user-specified, require VEP to match alleles when reporting co-located variants
-    $vep_cmd .= " --check_allele" if( $check_allele );
+    # Unless user says otherwise, require VEP to match alleles when reporting co-located variants
+    $vep_cmd .= " --check_allele" unless( $any_allele );
     # Add --cache-version only if the user specifically asked for a version
     $vep_cmd .= " --cache_version $cache_version" if( $cache_version );
     # Add options that only work on human variants
     $vep_cmd .= " --polyphen b --gmaf --maf_1kg --maf_esp" if( $species eq "homo_sapiens" );
     # Add options that work for most species, except a few
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
-    print STDERR "$vep_cmd\n";
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
@@ -375,7 +374,7 @@ __DATA__
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
- --check-allele   When reporting co-located variants, require the variant alleles to match [1]
+ --any-allele     When reporting co-located variants, allow mismatched variant alleles too
  --filter-vcf     The non-TCGA VCF from exac.broadinstitute.org [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
