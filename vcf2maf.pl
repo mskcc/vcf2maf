@@ -250,7 +250,7 @@ else {
 my $input_name = substr( $input_vcf, rindex( $input_vcf, "/" ) + 1 );
 $input_name =~ s/(\.vcf)*$//;
 
-# If a liftOver chain was provided, remap and replace the input VCF before annotation
+# If a liftOver chain was provided, remap and switch the input VCF before annotation
 my ( %remap, %remap_back );
 if( $remap_chain ) {
     # Find out if liftOver is properly installed, and warn the user if it's not
@@ -258,10 +258,10 @@ if( $remap_chain ) {
     chomp( $liftover );
     ( $liftover and -e $liftover ) or die "ERROR: Please install liftOver, and make sure it's in your PATH\n";
 
-    # Create a temporary folder where we can dump the intermediate files before/after liftOver
+    # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
     `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/$input_name.bed`;
     %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/$input_name.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
-    %remap_back = reverse %remap; # This is for restoring original loci in the annotated VCF
+    %remap_back = reverse %remap; # ::UNUSED:: For restoring original loci in the annotated VCF
     unlink( "$tmp_dir/$input_name.bed" );
 
     # Create a new VCF in the temp folder, with remapped loci on which we'll run annotation
@@ -340,7 +340,7 @@ if( $ncbi_build eq "GRCh37" or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep
     map{ my $loci = join( " ", map{s/^chr//; $_} @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
     foreach my $line ( split( "\n", $lines )) {
         my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
-        # Parse out data in the info column, and store it for later, along with REF, ALT, and FILTER
+        # Parse out data from info column, and store it for later, along with REF, ALT, and FILTER
         my $locus = ( $chr_prefix_in_use ? "chr$chr:$pos" : "$chr:$pos" );
         %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
         $filter_data{$locus}{REF} = $ref;
