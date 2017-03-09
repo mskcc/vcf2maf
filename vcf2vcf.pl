@@ -75,10 +75,6 @@ $new_normal_id = $vcf_normal_id unless( $new_normal_id );
 # If needed, create a temporary folder that will get deleted after a clean exit
 my $tmp_dir = tempdir( CLEANUP => 1 ) if( $remap_chain or $tumor_bam or $normal_bam );
 
-# Normalize indels with bcftools, just in case it wasn't already
-`bcftools norm --fasta-ref $ref_fasta --output $tmp_dir/input.norm.vcf $input_vcf 2> /dev/null`;
-$input_vcf = "$tmp_dir/input.norm.vcf";
-
 # If a liftOver chain was provided, remap and switch the input VCF before proceeding
 my %remap;
 if( $remap_chain ) {
