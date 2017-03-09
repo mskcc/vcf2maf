@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# vcf2vcf - Create a minimalist VCF from a given VCF, fixing various problems in the process
+# vcf2vcf - Create a standardized VCF from a given VCF, fixing various problems in the process
 
 use strict;
 use warnings;
@@ -8,13 +8,24 @@ use IO::File;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 use POSIX qw( strftime );
+use File::Temp qw( tempdir );
 
 # Set any default paths and constants
 my ( $vcf_tumor_id, $vcf_normal_id ) = ( "TUMOR", "NORMAL" );
 
+# Find out if samtools and bcftools are properly installed, and warn the user if it's not
+my ( $samtools ) = map{chomp; $_}`which samtools`;
+( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
+my ( $bcftools ) = map{chomp; $_}`which bcftools`;
+( $bcftools and -e $bcftools ) or die "ERROR: Please install bcftools, and make sure it's in your PATH\n";
+
+# E.g. Get DP:AD from tumor/normal BAMs for a TGG-insertion at GRCh38 loci 21:46302071-46302072:
+# ::NOTE:: This returns multiple lines+alleles, so the matching allele needs to be parsed out
+# samtools mpileup --region chr21:46302071-46302071 --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.005 --tandem-qual 80 --min-ireads 1 --open-prob 40 --platforms illumina --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa /ifs/res/pwg/gdc/files/95a08b09-c46a-458c-bd21-deb43a309b00/69f9c49d8f6376a7092cff2a3bd2922b_gdc_realn.bam /ifs/res/pwg/gdc/files/47ac9742-74bc-4d76-a2ac-46c708e9cbbd/e30ade9704fbc29ccd9e6b69c91db237_gdc_realn.bam | bcftools norm --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa
+
 # Define the minimal INFO and FORMAT fields that we want to retain
-my @retain_info = qw( SOMATIC SS );
-my @retain_format = qw( GT DP AD );
+my @retain_info = qw( SOMATIC SS I16 MQSB );
+my @retain_format = qw( GT DP AD ADF ADR );
 
 # Define FILTER descriptors that we'll add if user specified the --add-filters option
 my ( $min_tum_depth, $min_nrm_depth ) = ( 14, 8 );
@@ -32,7 +43,8 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 
 # Parse options and print usage if there is a syntax error, or if usage was explicitly requested
 my ( $man, $help, $add_filters ) = ( 0, 0, 0 );
-my ( $input_vcf, $output_vcf, $new_tumor_id, $new_normal_id );
+my ( $input_vcf, $output_vcf, $new_tumor_id, $new_normal_id, $remap_chain );
+my ( $tumor_bam, $normal_bam, $ref_fasta ) = ( "", "", "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz" );
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -42,48 +54,82 @@ GetOptions(
     'vcf-normal-id=s' => \$vcf_normal_id,
     'new-tumor-id=s' => \$new_tumor_id,
     'new-normal-id=s' => \$new_normal_id,
+    'tumor-bam=s' => \$tumor_bam,
+    'normal-bam=s' => \$normal_bam,
+    'ref-fasta=s' => \$ref_fasta,
+    'remap-chain=s' => \$remap_chain,
     'add-filters!' => \$add_filters
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
-# Make sure we were given an inout VCF file
+# Make sure we are given paths to the input and output VCF files, and a matched reference FASTA
 die "ERROR: Please specify an input file with --input-vcf. STDIN is not supported.\n" unless( $input_vcf );
+die "ERROR: Please specify an output file with --output-vcf. STDOUT is not supported.\n" unless( $output_vcf );
+die "ERROR: Provided --ref-fasta is missing or empty: $ref_fasta\n" unless( -s $ref_fasta );
 
 # Unless specified, assume that the new VCF will use the same sample IDs as the input VCF
 $new_tumor_id = $vcf_tumor_id unless( $new_tumor_id );
 $new_normal_id = $vcf_normal_id unless( $new_normal_id );
 
-# Initialize the output VCF file with the mandatory first line of a VCF header
-my $vcf_out_fh = *STDOUT; # Use STDOUT if an output VCF file was not defined
-$vcf_out_fh = IO::File->new( $output_vcf, ">" ) or die "ERROR: Couldn't open output VCF file: $output_vcf!\n" if( $output_vcf );
-$vcf_out_fh->print( "##fileformat=VCFv4.2\n" );
+# If needed, create a temporary folder that will get deleted after a clean exit
+my $tmp_dir = tempdir( CLEANUP => 1 ) if( $remap_chain or $tumor_bam or $normal_bam );
 
-# Also add today's date just cuz we can
-my $file_date = strftime( "%Y%m%d", localtime );
-$vcf_out_fh->print( "##fileDate=$file_date\n" );
+# Normalize indels with bcftools, just in case it wasn't already
+`bcftools norm --fasta-ref $ref_fasta --output $tmp_dir/input.norm.vcf $input_vcf 2> /dev/null`;
+$input_vcf = "$tmp_dir/input.norm.vcf";
 
-# And add our custom FILTER tag descriptors, if --add-filters was specified
-if( $add_filters ) {
-    $vcf_out_fh->print( "##FILTER=<ID=$_,Description=\"" . $filter_tags{$_} . "\">\n" ) foreach ( sort keys %filter_tags );
+# If a liftOver chain was provided, remap and switch the input VCF before proceeding
+my %remap;
+if( $remap_chain ) {
+    # Find out if liftOver is properly installed, and warn the user if it's not
+    my $liftover = `which liftOver`;
+    chomp( $liftover );
+    ( $liftover and -e $liftover ) or die "ERROR: Please install liftOver, and make sure it's in your PATH\n";
+
+    # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
+    `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/input.bed`;
+    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/input.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
+    unlink( "$tmp_dir/input.bed" );
+
+    # Create a new VCF in the temp folder, with remapped loci
+    my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
+    my $remap_vcf_fh = IO::File->new( "$tmp_dir/input.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/input.remap.vcf!\n";
+    while( my $line = $vcf_fh->getline ) {
+        if( $line =~ m/^#/ ) {
+            $remap_vcf_fh->print( $line ); # Write header lines unchanged
+        }
+        else {
+            chomp( $line );
+            my @cols = split( "\t", $line );
+            my $locus = $cols[0] . ":" . $cols[1];
+            if( defined $remap{$locus} ) {
+                @cols[0,1] = split( ":", $remap{$locus} );
+                $remap_vcf_fh->print( join( "\t", @cols ), "\n" );
+            }
+            else {
+                warn "WARNING: Skipping variant at $locus; Unable to liftOver using $remap_chain\n";
+            }
+        }
+    }
+    $remap_vcf_fh->close;
+    $vcf_fh->close;
+    $input_vcf = "$tmp_dir/input.remap.vcf";
 }
 
-# Parse through each variant in the annotated VCF, and fix 'em
+# Parse through each variant in the input VCF, and fix 'em up
 my $vcf_in_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open input VCF file: $input_vcf!\n";
-my ( $vcf_tumor_idx, $vcf_normal_idx, %vcf_header_lines );
+my ( $vcf_tumor_idx, $vcf_normal_idx, %vcf_header, @vcf_lines );
 while( my $line = $vcf_in_fh->getline ) {
 
     # Skip all but a few INFO/FORMAT/FILTER descriptors in the header
     if( $line =~ m/^##/ ) {
-        # Retain only the minimal INFO amd FORMAT descriptor lines in the header
-        if( $line =~ m/^##(INFO|FORMAT)=<ID=([^,]+)/ ) {
+        # Retain only the minimal INFO and FORMAT descriptor lines in the header
+        if( $line =~ m/^##(INFO|FORMAT|FILTER)=<ID=([^,]+)/ ) {
             my ( $type, $tag ) = ( $1, $2 );
-            if(( $type eq "INFO" and grep( $tag, @retain_info )) or ( $type eq "FORMAT" and grep( $tag, @retain_format ))) {
-                $vcf_out_fh->print( $line );
+            if(( $type eq "INFO" and grep( /^$tag$/, @retain_info )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format )) or $type eq "FILTER" ) {
+                $vcf_header{$type}{$tag} = $line;
             }
-        }
-        elsif( $line =~ m/^##FILTER=<ID=([^,]+)/ and !defined $filter_tags{$1}) {
-            $vcf_out_fh->print( $line );
         }
         next;
     }
@@ -101,7 +147,7 @@ while( my $line = $vcf_in_fh->getline ) {
             ( defined $vcf_tumor_idx ) or warn "WARNING: No genotype column for $vcf_tumor_id in VCF!\n";
             ( defined $vcf_normal_idx ) or warn "WARNING: No genotype column for $vcf_normal_id in VCF!\n";
         }
-        $vcf_out_fh->print( "#", join( "\t", qw( CHROM POS ID REF ALT QUAL FILTER INFO FORMAT ), $new_tumor_id, $new_normal_id ), "\n" );
+        push( @vcf_lines, "#" . join( "\t", qw( CHROM POS ID REF ALT QUAL FILTER INFO FORMAT ), $new_tumor_id, $new_normal_id ) . "\n" );
         next;
     }
 
@@ -109,9 +155,8 @@ while( my $line = $vcf_in_fh->getline ) {
     $qual = "." unless( defined $qual and $qual ne "" );
     $filter = "." unless( defined $filter and $filter ne "" );
 
-    # Parse out the data in the info column, and retain only the minimal fields
+    # Parse out the data in the info column
     my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "" ))} split( /\;/, $info_line );
-    $info_line = join( ";", map{( $info{$_} eq "" ? "$_" : "$_=$info{$_}" )} grep{defined $info{$_}} @retain_info );
 
     # By default, the variant allele is the first (usually the only) allele listed under ALT
     # If there are multiple ALT alleles, choose the allele specified in the tumor GT field
@@ -151,6 +196,90 @@ while( my $line = $vcf_in_fh->getline ) {
         $nrm_info{GT} = "./." unless( defined $nrm_info{GT} and $nrm_info{GT} ne '.' );
     }
 
+    # If we have either/both tumor/normal BAMs, then let's generate mpileup in VCF format
+    if( $tumor_bam or $normal_bam ) {
+
+        # Let's wipe clean values for DP:AD:ADF:ADR since we're about to override them
+        $tum_info{DP} = $tum_info{AD} = $tum_info{ADF} = $tum_info{ADR} = ".";
+        $nrm_info{DP} = $nrm_info{AD} = $nrm_info{ADF} = $nrm_info{ADR} = ".";
+
+        # Generate mpileup and parse out only DP,AD,ADF,ADR for tumor/normal samples
+        my @p_lines = `samtools mpileup --region $chrom:$pos-$pos --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --platforms illumina --fasta-ref $ref_fasta $tumor_bam $normal_bam 2> /dev/null | bcftools norm --fasta-ref $ref_fasta 2> /dev/null`;
+
+        my ( $p_vcf_tumor_idx, $p_vcf_normal_idx ) = ( 0, 1 );
+        foreach my $p_line ( @p_lines ) {
+
+            # Retain only the minimal INFO and FORMAT descriptor lines in the header
+            if( $p_line =~ m/^##/ ) {
+                if( $p_line =~ m/^##(INFO|FORMAT)=<ID=([^,]+)/ ) {
+                    my ( $type, $tag ) = ( $1, $2 );
+                    if(( $type eq "INFO" and grep( /^$tag$/, @retain_info )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format ))) {
+                        $vcf_header{$type}{$tag} = $p_line;
+                    }
+                }
+                next;
+            }
+
+            chomp( $p_line );
+            # Parse the column headers to locate the tumor/normal genotype fields
+            my ( $p_chrom, $p_pos, undef, $p_ref, $p_alt, undef, undef, $p_info_line, $p_format_line, @p_rest ) = split( "\t", $p_line );
+            if( $p_line =~ m/^#CHROM/ and $p_format_line and scalar( @p_rest ) > 0 ) {
+                for( my $i = 0; $i <= $#p_rest; ++$i ) {
+                    $p_vcf_tumor_idx = $i if( $p_rest[$i] eq $tumor_bam );
+                    $p_vcf_normal_idx = $i if( $p_rest[$i] eq $normal_bam );
+                }
+                next;
+            }
+
+            # Parse out the data in the info column, and add it to the INFO fields from input
+            %info = ( %info, map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "" ))} split( /\;/, $p_info_line ));
+
+            # Parse out the mpileup REF/ALT alleles and match them to the input REF/ALT alleles
+            my @p_alts = split( /,/, $p_alt );
+            my %p_allele_idx = ( $alleles[0], 0 ); # The reference allele doesn't need to match
+            for( my $i = 1; $i <= $#alleles; ++$i ) {
+                foreach my $p_alt ( @p_alts ) {
+                    # De-pad suffixed bps that are identical between ref/var alleles
+                    my $p_ref_norm = $p_ref;
+                    while( $p_ref_norm and $p_alt and substr( $p_ref_norm, -1, 1 ) eq substr( $p_alt, -1, 1 ) and $p_ref_norm ne $p_alt ) {
+                        ( $p_ref_norm, $p_alt ) = map{substr( $_, 0, -1 )} ( $p_ref_norm, $p_alt );
+                    }
+                    # Make sure that both REF and ALT alleles match, because deletions can vary
+                    if( $p_ref_norm eq $alleles[0] and $p_alt eq $alleles[$i] ) {
+                        $p_allele_idx{$p_alt} = $i;
+                        next;
+                    }
+                }
+            }
+
+            # If genotype fields were generated for this variant, then parse out relevant data
+            my ( $idx, %p_tum_info, %p_nrm_info );
+            my @format_keys = split( /\:/, $p_format_line );
+            if( defined $p_rest[$p_vcf_tumor_idx] ) {
+                $idx = 0;
+                %p_tum_info = map{( $format_keys[$idx++], $_ )} split( /\:/, $p_rest[$p_vcf_tumor_idx] );
+                $tum_info{DP} = $p_tum_info{DP};
+                my @depths = split( ",", $p_tum_info{AD} );
+                $tum_info{AD} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+                @depths = split( ",", $p_tum_info{ADF} );
+                $tum_info{ADF} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+                @depths = split( ",", $p_tum_info{ADR} );
+                $tum_info{ADR} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+            }
+            if( defined $p_rest[$p_vcf_normal_idx] ) {
+                $idx = 0;
+                %p_nrm_info = map{( $format_keys[$idx++], $_ )} split( /\:/, $p_rest[$p_vcf_normal_idx] );
+                $nrm_info{DP} = $p_nrm_info{DP};
+                my @depths = split( ",", $p_nrm_info{AD} );
+                $nrm_info{AD} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+                @depths = split( ",", $p_nrm_info{ADF} );
+                $nrm_info{ADF} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+                @depths = split( ",", $p_nrm_info{ADR} );
+                $nrm_info{ADR} = join( ",", map{(defined $p_allele_idx{$_} ? $depths[$p_allele_idx{$_}] : 0)} @alleles );
+            }
+        }
+    }
+
     # Add more filter tags to the FILTER field, if --add-filters was specified
     if( $add_filters ) {
         my %tags = ();
@@ -166,14 +295,38 @@ while( my $line = $vcf_in_fh->getline ) {
         $filter = ( $tags_to_add ? $tags_to_add : $filter );
     }
 
+    # Retain only the minimal INFO fields
+    $info_line = join( ";", map{( $info{$_} eq "" ? "$_" : "$_=$info{$_}" )} grep{defined $info{$_}} @retain_info );
+
     # Print a VCF file with minimal genotype fields for tumor and normal
     $format_line = join( ":", @retain_format );
     my $tum_fmt = join( ":", map{( $tum_info{$_} ? $tum_info{$_} : "." )} @retain_format );
     my $nrm_fmt = join( ":", map{( $nrm_info{$_} ? $nrm_info{$_} : "." )} @retain_format );
-    $vcf_out_fh->print( join( "\t", $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, $tum_fmt, $nrm_fmt ), "\n" );
+    push( @vcf_lines, join( "\t", $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, $tum_fmt, $nrm_fmt ) . "\n" );
 }
-$vcf_out_fh->close if( $output_vcf );
 $vcf_in_fh->close;
+
+# Initialize the output VCF file with the mandatory first line of a VCF header
+my $vcf_out_fh = IO::File->new( $output_vcf, ">" ) or die "ERROR: Couldn't open output VCF file: $output_vcf!\n";
+$vcf_out_fh->print( "##fileformat=VCFv4.2\n" );
+
+# Also add today's date just cuz we can
+my $file_date = strftime( "%Y%m%d", localtime );
+$vcf_out_fh->print( "##fileDate=$file_date\n" );
+
+# Append all shortlited INFO/FORMAT/FILTER descriptors collected earlier
+$vcf_out_fh->print( map{$vcf_header{INFO}{$_}} sort keys %{$vcf_header{INFO}} );
+$vcf_out_fh->print( map{$vcf_header{FORMAT}{$_}} sort keys %{$vcf_header{FORMAT}} );
+$vcf_out_fh->print( map{$vcf_header{FILTER}{$_}} sort keys %{$vcf_header{FILTER}} );
+
+# Append our custom FILTER tag descriptors, if --add-filters was specified
+if( $add_filters ) {
+    $vcf_out_fh->print( "##FILTER=<ID=$_,Description=\"" . $filter_tags{$_} . "\">\n" ) foreach ( sort keys %filter_tags );
+}
+
+# Append all the column header and variant lines accumulated earlier
+$vcf_out_fh->print( @vcf_lines );
+$vcf_out_fh->close;
 
 # Fix the AD and DP fields, given data from a FORMATted genotype string
 sub FixAlleleDepths {
@@ -271,7 +424,7 @@ __DATA__
 
 =head1 NAME
 
- vcf2vcf.pl - Create a minimalist VCF from a given VCF, fixing various problems in the process
+ vcf2vcf.pl - Create a standardized VCF from a given VCF, fixing common problems in the process
 
 =head1 SYNOPSIS
 
@@ -280,19 +433,23 @@ __DATA__
 
 =head1 OPTIONS
 
- --input-vcf      Path to input file in VCF format
- --output-vcf     Path to output VCF file [Default: STDOUT]
+ --input-vcf      Path to input file, a VCF or VCF-like format
+ --output-vcf     Path to output file, a standardized VCF format
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype column [Default: TUMOR]
  --vcf-normal-id  Matched normal ID used in VCF's genotype column [Default: NORMAL]
  --new-tumor-id   Tumor sample ID to use in the new VCF [Default: --vcf-tumor-id]
  --new-normal-id  Matched normal ID to use in the new VCF [Default: --vcf-normal-id]
+ --tumor-bam      Path to tumor BAM, if provided, will add or override DP:AD:ADF:ADR in output VCF
+ --normal-bam     Path to normal BAM, if provided, will add or override DP:AD:ADF:ADR in output VCF
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --remap-chain    Chain file to remap variants to a different assembly before standardizing VCF
  --add-filters    Use this to add some extra tags under FILTER [Default: 0]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
 =head1 DESCRIPTION
 
-The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a VCF with only important fields in INFO and FORMAT, like GT:DP:AD. Specify the --add-filters option, which will use the allele depths and fractions to add more tags under FILTER.
+The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a VCF with only important fields in INFO and FORMAT, like GT:DP:AD. You may optionally specify --add-filters, to use these allele depths and fractions to add more tags under FILTER.
 
 =head2 Relevant links:
 
