@@ -864,6 +864,12 @@ sub FixAlleleDepths {
         # Reference allele depth is not provided by Strelka for indels, so we have to skip it
         @depths = ( "", ( split /,/, $fmt_info{TIR} )[0] );
     }
+    # Handle VCF lines by CaVEMan, where allele depths are in FAZ:FCZ:FGZ:FTZ:RAZ:RCZ:RGZ:RTZ
+    elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/FAZ FCZ FGZ FTZ RAZ RCZ RGZ RTZ/ ) == 8 ) {
+        # Create tags for forward+reverse strand reads, and use those to determine REF/ALT depths
+        map{ $fmt_info{$_} = $fmt_info{'F'.$_} + $fmt_info{'R'.$_} } qw( AZ CZ GZ TZ );
+        @depths = map{( defined $fmt_info{$_.'Z'} ? $fmt_info{$_.'Z'} : "" )} @alleles;
+    }
     # Handle VCF lines from the Ion Torrent Suite where ALT depths are in AO and REF depths are in RO
     elsif( !defined $fmt_info{AD} and defined $fmt_info{AO} and defined $fmt_info{RO} ) {
         @depths = ( $fmt_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AO} ));
