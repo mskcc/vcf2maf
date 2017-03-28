@@ -874,6 +874,13 @@ sub FixAlleleDepths {
     elsif( !defined $fmt_info{AD} and defined $fmt_info{AO} and defined $fmt_info{RO} ) {
         @depths = ( $fmt_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AO} ));
     }
+    # Handle VCF lines from cgpPindel, where ALT depth and total depth are in PP:NP:PR:NR
+    elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/PP NP PR NR/ ) == 4 ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[$var_allele_idx] = $fmt_info{PP} + $fmt_info{NP};
+        $fmt_info{DP} = $fmt_info{PR} + $fmt_info{NR};
+    }
     # Handle VCF lines with ALT allele fraction in FA, which needs to be multiplied by DP to get AD
     elsif( !defined $fmt_info{AD} and defined $fmt_info{FA} and defined $fmt_info{DP} and $fmt_info{DP} ne '.' ) {
         # Reference allele depth and depths for any other ALT alleles must be left undefined
