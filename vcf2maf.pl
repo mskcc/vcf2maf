@@ -46,6 +46,7 @@ sub GetEffectPriority {
         'disruptive_inframe_deletion' => 5, # An inframe decrease in cds length that deletes bases from the coding sequence starting within an existing codon
         'inframe_insertion' => 5, # An inframe non synonymous variant that inserts bases into the coding sequence
         'inframe_deletion' => 5, # An inframe non synonymous variant that deletes bases from the coding sequence
+        'protein_altering_variant' => 5, # A sequence variant which is predicted to change the protein encoded in the coding sequence
         'missense_variant' => 6, # A sequence variant, that changes one or more bases, resulting in a different amino acid sequence but where the length is preserved
         'conservative_missense_variant' => 6, # A sequence variant whereby at least one base of a codon is changed resulting in a codon that encodes for a different but similar amino acid. These variants may or may not be deleterious
         'rare_amino_acid_variant' => 6, # A sequence variant whereby at least one base of a codon encoding a rare amino acid is changed, resulting in a different encoded amino acid
@@ -54,7 +55,6 @@ sub GetEffectPriority {
         'stop_retained_variant' => 9, # A sequence variant where at least one base in the terminator codon is changed, but the terminator remains
         'synonymous_variant' => 9, # A sequence variant where there is no resulting change to the encoded amino acid
         'incomplete_terminal_codon_variant' => 10, # A sequence variant where at least one base of the final codon of an incompletely annotated transcript is changed
-        'protein_altering_variant' => 11, # A sequence variant which is predicted to change the protein encoded in the coding sequence
         'coding_sequence_variant' => 11, # A sequence variant that changes the coding sequence
         'mature_miRNA_variant' => 11, # A transcript variant located with the sequence of the mature miRNA
         'exon_variant' => 11, # A sequence variant that changes exon sequence
