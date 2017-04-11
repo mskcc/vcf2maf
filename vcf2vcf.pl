@@ -12,6 +12,8 @@ use File::Temp qw( tempdir );
 
 # Set any default paths and constants
 my ( $vcf_tumor_id, $vcf_normal_id ) = ( "TUMOR", "NORMAL" );
+my ( $add_header, $add_info ) = ( "", "" );
+my ( $retain_info, $retain_format ) = ( "SOMATIC,SS,I16,MQSB", "GT,DP,AD,ADF,ADR" );
 
 # Find out if samtools and bcftools are properly installed, and warn the user if it's not
 my ( $samtools ) = map{chomp; $_}`which samtools`;
@@ -22,10 +24,6 @@ my ( $bcftools ) = map{chomp; $_}`which bcftools`;
 # E.g. Get DP:AD from tumor/normal BAMs for a TGG-insertion at GRCh38 loci 21:46302071-46302072:
 # ::NOTE:: This returns multiple lines+alleles, so the matching allele needs to be parsed out
 # samtools mpileup --region chr21:46302071-46302071 --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.005 --tandem-qual 80 --min-ireads 1 --open-prob 40 --platforms illumina --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa /ifs/res/pwg/gdc/files/95a08b09-c46a-458c-bd21-deb43a309b00/69f9c49d8f6376a7092cff2a3bd2922b_gdc_realn.bam /ifs/res/pwg/gdc/files/47ac9742-74bc-4d76-a2ac-46c708e9cbbd/e30ade9704fbc29ccd9e6b69c91db237_gdc_realn.bam | bcftools norm --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa
-
-# Define the minimal INFO and FORMAT fields that we want to retain
-my @retain_info = qw( SOMATIC SS I16 MQSB );
-my @retain_format = qw( GT DP AD ADF ADR );
 
 # Define FILTER descriptors that we'll add if user specified the --add-filters option
 my ( $min_tum_depth, $min_nrm_depth ) = ( 14, 8 );
@@ -57,6 +55,10 @@ GetOptions(
     'tumor-bam=s' => \$tumor_bam,
     'normal-bam=s' => \$normal_bam,
     'ref-fasta=s' => \$ref_fasta,
+    'add-header=s' => \$add_header,
+    'add-info=s' => \$add_info,
+    'retain-info=s' => \$retain_info,
+    'retain-format=s' => \$retain_format,
     'remap-chain=s' => \$remap_chain,
     'add-filters!' => \$add_filters
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
@@ -71,6 +73,16 @@ die "ERROR: Provided --ref-fasta is missing or empty: $ref_fasta\n" unless( -s $
 # Unless specified, assume that the new VCF will use the same sample IDs as the input VCF
 $new_tumor_id = $vcf_tumor_id unless( $new_tumor_id );
 $new_normal_id = $vcf_normal_id unless( $new_normal_id );
+
+# To grep them easily, make vectors containing the INFO/FORMAT tags
+my @retain_info_tags = split( ",", $retain_info );
+my @retain_format_tags = split( ",", $retain_format );
+
+# If user defined additional INFO tags, then wipe clean any whitespace, and make it ";" delimited
+if( $add_info ) {
+    $add_info =~ s/\s//g;
+    $add_info =~ s/,/;/g;
+}
 
 # If needed, create a temporary folder that will get deleted after a clean exit
 my $tmp_dir = tempdir( CLEANUP => 1 ) if( $remap_chain or $tumor_bam or $normal_bam );
@@ -123,7 +135,7 @@ while( my $line = $vcf_in_fh->getline ) {
         # Retain only the minimal INFO and FORMAT descriptor lines in the header
         if( $line =~ m/^##(INFO|FORMAT|FILTER)=<ID=([^,]+)/ ) {
             my ( $type, $tag ) = ( $1, $2 );
-            if(( $type eq "INFO" and grep( /^$tag$/, @retain_info )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format )) or $type eq "FILTER" ) {
+            if(( $type eq "INFO" and grep( /^$tag$/, @retain_info_tags )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format_tags )) or $type eq "FILTER" ) {
                 $vcf_header{$type}{$tag} = $line;
             }
         }
@@ -209,15 +221,15 @@ while( my $line = $vcf_in_fh->getline ) {
             if( $p_line =~ m/^##/ ) {
                 if( $p_line =~ m/^##(INFO|FORMAT)=<ID=([^,]+)/ ) {
                     my ( $type, $tag ) = ( $1, $2 );
-                    if(( $type eq "INFO" and grep( /^$tag$/, @retain_info )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format ))) {
+                    if(( $type eq "INFO" and grep( /^$tag$/, @retain_info_tags )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format_tags ))) {
                         $vcf_header{$type}{$tag} = $p_line;
                     }
                 }
                 next;
             }
 
-            chomp( $p_line );
             # Parse the column headers to locate the tumor/normal genotype fields
+            chomp( $p_line );
             my ( $p_chrom, $p_pos, undef, $p_ref, $p_alt, undef, undef, $p_info_line, $p_format_line, @p_rest ) = split( "\t", $p_line );
             if( $p_line =~ m/^#CHROM/ and $p_format_line and scalar( @p_rest ) > 0 ) {
                 for( my $i = 0; $i <= $#p_rest; ++$i ) {
@@ -291,13 +303,14 @@ while( my $line = $vcf_in_fh->getline ) {
         $filter = ( $tags_to_add ? $tags_to_add : $filter );
     }
 
-    # Retain only the minimal INFO fields
-    $info_line = join( ";", map{( $info{$_} eq "" ? "$_" : "$_=$info{$_}" )} grep{defined $info{$_}} @retain_info );
+    # Retain only the default or user-defined INFO fields, and add any additional fields if defined
+    $info_line = join( ";", map{( $info{$_} eq "" ? "$_" : "$_=$info{$_}" )} grep{defined $info{$_}} @retain_info_tags );
+    $info_line = ( $info_line ? ( $add_info ? join( ";", $add_info, $info_line ) : $info_line ) : $add_info );
 
-    # Print a VCF file with minimal genotype fields for tumor and normal
-    $format_line = join( ":", @retain_format );
-    my $tum_fmt = join( ":", map{( $tum_info{$_} ? $tum_info{$_} : "." )} @retain_format );
-    my $nrm_fmt = join( ":", map{( $nrm_info{$_} ? $nrm_info{$_} : "." )} @retain_format );
+    # Print a VCF file with default or user-defined genotype fields for tumor and normal
+    $format_line = join( ":", @retain_format_tags );
+    my $tum_fmt = join( ":", map{( $tum_info{$_} ? $tum_info{$_} : "." )} @retain_format_tags );
+    my $nrm_fmt = join( ":", map{( $nrm_info{$_} ? $nrm_info{$_} : "." )} @retain_format_tags );
     push( @vcf_lines, join( "\t", $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, $tum_fmt, $nrm_fmt ) . "\n" );
 }
 $vcf_in_fh->close;
@@ -314,6 +327,12 @@ $vcf_out_fh->print( "##fileDate=$file_date\n" );
 $vcf_out_fh->print( map{$vcf_header{INFO}{$_}} sort keys %{$vcf_header{INFO}} );
 $vcf_out_fh->print( map{$vcf_header{FORMAT}{$_}} sort keys %{$vcf_header{FORMAT}} );
 $vcf_out_fh->print( map{$vcf_header{FILTER}{$_}} sort keys %{$vcf_header{FILTER}} );
+
+# Append any user-defined header lines
+if( $add_header ) {
+    $add_header =~ s/\s*$/\n/;
+    $vcf_out_fh->print( $add_header );
+}
 
 # Append our custom FILTER tag descriptors, if --add-filters was specified
 if( $add_filters ) {
@@ -444,13 +463,17 @@ __DATA__
 
  --input-vcf      Path to input file, a VCF or VCF-like format
  --output-vcf     Path to output file, a standardized VCF format
- --vcf-tumor-id   Tumor sample ID used in VCF's genotype column [Default: TUMOR]
- --vcf-normal-id  Matched normal ID used in VCF's genotype column [Default: NORMAL]
- --new-tumor-id   Tumor sample ID to use in the new VCF [Default: --vcf-tumor-id]
- --new-normal-id  Matched normal ID to use in the new VCF [Default: --vcf-normal-id]
+ --vcf-tumor-id   Tumor sample ID used in VCF's genotype column [TUMOR]
+ --vcf-normal-id  Matched normal ID used in VCF's genotype column [NORMAL]
+ --new-tumor-id   Tumor sample ID to use in the new VCF [--vcf-tumor-id]
+ --new-normal-id  Matched normal ID to use in the new VCF [--vcf-normal-id]
  --tumor-bam      Path to tumor BAM, if provided, will add or override DP:AD:ADF:ADR in output VCF
  --normal-bam     Path to normal BAM, if provided, will add or override DP:AD:ADF:ADR in output VCF
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --add-header     VCF-style header lines to add to the output VCF; Use "\n" to separate lines []
+ --add-info       Comma-delimited tag=value pairs to add as INFO fields in the output VCF []
+ --retain-info    Comma-delimited names of INFO fields to retain in output VCF [SOMATIC,SS,I16,MQSB]
+ --retain-format  Comma-delimited names of FORMATted genotype fields to retain in output VCF [GT,DP,AD,ADF,ADR]
  --remap-chain    Chain file to remap variants to a different assembly before standardizing VCF
  --add-filters    Use this to add some extra tags under FILTER [Default: 0]
  --help           Print a brief help message and quit
