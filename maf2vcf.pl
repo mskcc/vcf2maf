@@ -228,10 +228,7 @@ while( my $line = $maf_fh->getline ) {
     my ( $ref_len, $al1_len, $al2_len ) = map{ length( $_ ) } ( $ref, $al1, $al2 );
     if( $ref_len == 0 or $al1_len == 0 or $al2_len == 0 or ( $ref_len ne $al2_len and substr( $ref, 0, 1 ) ne substr( $al2, 0, 1 ))) {
         my $prefix_bp = substr( $flanking_bps{$locus}, 0, 1 );
-        # For MAF-format simple insertions, $pos is already the locus of the preceding bp
-        $prefix_bp = substr( $flanking_bps{$locus}, 1, 1 ) if( $ref eq "" );
-        # If this is not a MAF-format simple insertion, decrement $pos
-        --$pos unless( $ref eq "" );
+        --$pos;
         # Prefix the fetched reference bp to all the alleles
         ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{$prefix_bp.$_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
     }
