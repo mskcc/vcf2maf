@@ -588,8 +588,9 @@ while( my $line = $annotated_vcf_fh->getline ) {
             # Remove the prefixed HGVSc code in HGVSp, if found
             $effect{HGVSp} =~ s/^.*\((p\.\S+)\)/$1/ if( $effect{HGVSp} and $effect{HGVSp} =~ m/^c\./ );
 
-            # If there are several consequences listed for a transcript, choose the most severe one
-            ( $effect{One_Consequence} ) = sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( ",", $effect{Consequence} );
+            # Sort consequences by decreasing order of severity, and pick the most severe one
+            $effect{Consequence} = join( ",", sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( ",", $effect{Consequence} ));
+            ( $effect{One_Consequence} ) = split( ",", $effect{Consequence} );
 
             # When VEP fails to provide any value in Consequence, tag it as an intergenic variant
             $effect{One_Consequence} = "intergenic_variant" unless( $effect{Consequence} );
