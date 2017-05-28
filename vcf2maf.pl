@@ -720,7 +720,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         my $protein_change = ( $effect->{HGVSp} ? $effect->{HGVSp} : '' );
         my $transcript_id = ( $effect->{Transcript_ID} ? $effect->{Transcript_ID} : '' );
         my $refseq_ids = ( $effect->{RefSeq} ? $effect->{RefSeq} : '' );
-        $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $gene_name and $effect_type and $transcript_id );
+        $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $effect_type and $transcript_id );
     }
 
     # If this variant was seen in the ExAC VCF, let's report allele counts and frequencies
