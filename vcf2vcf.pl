@@ -23,7 +23,7 @@ my ( $bcftools ) = map{chomp; $_}`which bcftools`;
 
 # E.g. Get DP:AD from tumor/normal BAMs for a TGG-insertion at GRCh38 loci 21:46302071-46302072:
 # ::NOTE:: This returns multiple lines+alleles, so the matching allele needs to be parsed out
-# samtools mpileup --region chr21:46302071-46302071 --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.005 --tandem-qual 80 --min-ireads 1 --open-prob 40 --platforms illumina --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa /ifs/res/pwg/gdc/files/95a08b09-c46a-458c-bd21-deb43a309b00/69f9c49d8f6376a7092cff2a3bd2922b_gdc_realn.bam /ifs/res/pwg/gdc/files/47ac9742-74bc-4d76-a2ac-46c708e9cbbd/e30ade9704fbc29ccd9e6b69c91db237_gdc_realn.bam | bcftools norm --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa
+# samtools mpileup --region chr21:46302071-46302071 --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa /ifs/tcga/gdc/files/95a08b09-c46a-458c-bd21-deb43a309b00/69f9c49d8f6376a7092cff2a3bd2922b_gdc_realn.bam /ifs/tcga/gdc/files/47ac9742-74bc-4d76-a2ac-46c708e9cbbd/e30ade9704fbc29ccd9e6b69c91db237_gdc_realn.bam | bcftools norm --fasta-ref /ifs/depot/assemblies/H.sapiens/GRCh38_GDC/GRCh38.d1.vd1.fa
 
 # Define FILTER descriptors that we'll add if user specified the --add-filters option
 my ( $min_tum_depth, $min_nrm_depth ) = ( 14, 8 );
@@ -212,7 +212,7 @@ while( my $line = $vcf_in_fh->getline ) {
         $nrm_info{DP} = $nrm_info{AD} = $nrm_info{ADF} = $nrm_info{ADR} = ".";
 
         # Generate mpileup and parse out only DP,AD,ADF,ADR for tumor/normal samples
-        my @p_lines = `samtools mpileup --region $chrom:$pos-$pos --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --platforms illumina --fasta-ref $ref_fasta $tumor_bam $normal_bam 2> /dev/null | bcftools norm --fasta-ref $ref_fasta 2> /dev/null`;
+        my @p_lines = `samtools mpileup --region $chrom:$pos-$pos --count-orphans --no-BAQ --min-MQ 1 --min-BQ 20 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --BCF --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --fasta-ref $ref_fasta $tumor_bam $normal_bam 2> /dev/null | bcftools norm --fasta-ref $ref_fasta 2> /dev/null`;
 
         my ( $p_vcf_tumor_idx, $p_vcf_normal_idx ) = ( 0, 1 );
         foreach my $p_line ( @p_lines ) {
