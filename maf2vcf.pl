@@ -56,6 +56,9 @@ my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open input MAF:
 my ( %uniq_regions, %flanking_bps, @tn_pair, %col_idx, $header_line );
 while( my $line = $maf_fh->getline ) {
 
+    # If the file uses Mac OS 9 newlines, quit with an error
+    ( $line !~ m/\r$/ ) or die "ERROR: Your MAF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
+
     # Skip comment lines
     next if( $line =~ m/^#/ );
 
@@ -75,7 +78,7 @@ while( my $line = $maf_fh->getline ) {
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
         my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
-        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`grep -Eiv "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
+        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`grep -aEiv "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
 
         # Quit if one of the TN barcodes are missing, or they contain characters not allowed in Unix filenames
         map{ ( !m/^\s*$|^#|\0|\// ) or die "ERROR: Invalid Tumor_Sample_Barcode in MAF: \"$_\"\n"} @tn_pair;

@@ -104,6 +104,9 @@ if( $remap_chain ) {
     my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
     my $remap_vcf_fh = IO::File->new( "$tmp_dir/input.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/input.remap.vcf!\n";
     while( my $line = $vcf_fh->getline ) {
+        # If the file uses Mac OS 9 newlines, quit with an error
+        ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
+
         if( $line =~ m/^#/ ) {
             $remap_vcf_fh->print( $line ); # Write header lines unchanged
         }

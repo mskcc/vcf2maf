@@ -268,6 +268,9 @@ if( $remap_chain ) {
     my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
     my $remap_vcf_fh = IO::File->new( "$tmp_dir/$input_name.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.remap.vcf!\n";
     while( my $line = $orig_vcf_fh->getline ) {
+        # If the file uses Mac OS 9 newlines, quit with an error
+        ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
+
         if( $line =~ m/^#/ ) {
             $remap_vcf_fh->print( $line ); # Write header lines unchanged
         }
@@ -294,6 +297,9 @@ if( $remap_chain ) {
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
 my ( %ref_bps, @ref_regions, %uniq_loci, %uniq_regions, %flanking_bps, %filter_data );
 while( my $line = $vcf_fh->getline ) {
+    # If the file uses Mac OS 9 newlines, quit with an error
+    ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
+
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
     chomp( $line );
