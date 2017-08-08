@@ -13,7 +13,7 @@ use File::Temp qw( tempdir );
 # Set any default paths and constants
 my ( $vcf_tumor_id, $vcf_normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $add_header, $add_info ) = ( "", "" );
-my ( $retain_info, $retain_format ) = ( "SOMATIC,SS,I16,MQSB", "GT,DP,AD,ADF,ADR" );
+my ( $retain_info, $retain_format ) = ( "SOMATIC,SS,I16,MQSB", "GT,DP,AD" );
 
 # Find out if samtools and bcftools are properly installed, and warn the user if it's not
 my ( $samtools ) = map{chomp; $_}`which samtools`;
@@ -141,6 +141,10 @@ while( my $line = $vcf_in_fh->getline ) {
             if(( $type eq "INFO" and grep( /^$tag$/, @retain_info_tags )) or ( $type eq "FORMAT" and grep( /^$tag$/, @retain_format_tags )) or $type eq "FILTER" ) {
                 $vcf_header{$type}{$tag} = $line;
             }
+        }
+        elsif( $line =~ m/^##(source|reference|assembly|phasing)=/ ) {
+            my $tag = $1;
+            $vcf_header{MAIN}{$tag} = $line;
         }
         next;
     }
@@ -314,8 +318,8 @@ while( my $line = $vcf_in_fh->getline ) {
 
     # Print a VCF file with default or user-defined genotype fields for tumor and normal
     $format_line = join( ":", @retain_format_tags );
-    my $tum_fmt = join( ":", map{( $tum_info{$_} ? $tum_info{$_} : "." )} @retain_format_tags );
-    my $nrm_fmt = join( ":", map{( $nrm_info{$_} ? $nrm_info{$_} : "." )} @retain_format_tags );
+    my $tum_fmt = join( ":", map{( defined $tum_info{$_} ? $tum_info{$_} : "." )} @retain_format_tags );
+    my $nrm_fmt = join( ":", map{( defined $nrm_info{$_} ? $nrm_info{$_} : "." )} @retain_format_tags );
     push( @vcf_lines, join( "\t", $chrom, $pos, $ids, $ref, $alt, $qual, $filter, $info_line, $format_line, $tum_fmt, $nrm_fmt ) . "\n" );
 }
 $vcf_in_fh->close;
@@ -328,7 +332,8 @@ $vcf_out_fh->print( "##fileformat=VCFv4.2\n" );
 my $file_date = strftime( "%Y%m%d", localtime );
 $vcf_out_fh->print( "##fileDate=$file_date\n" );
 
-# Append all shortlited INFO/FORMAT/FILTER descriptors collected earlier
+# Append all shortlisted MAIN/INFO/FORMAT/FILTER descriptors collected earlier
+$vcf_out_fh->print( map{$vcf_header{MAIN}{$_}} sort keys %{$vcf_header{MAIN}} );
 $vcf_out_fh->print( map{$vcf_header{INFO}{$_}} sort keys %{$vcf_header{INFO}} );
 $vcf_out_fh->print( map{$vcf_header{FORMAT}{$_}} sort keys %{$vcf_header{FORMAT}} );
 $vcf_out_fh->print( map{$vcf_header{FILTER}{$_}} sort keys %{$vcf_header{FILTER}} );
