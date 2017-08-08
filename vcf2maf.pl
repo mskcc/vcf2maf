@@ -769,7 +769,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Copy FILTER from input VCF, and tag calls with high allele counts in any ExAC subpopulation
     my $subpop_count = 0;
     # Remove existing common_variant tags from input, so it's redefined by our criteria here
-    $filter = join( ",", grep{ $_ ne "common_variant" } split( ",", $filter ));
+    $filter = join( ";", grep{ $_ ne "common_variant" } split( /,|;/, $filter ));
     foreach my $subpop ( qw( AFR AMR EAS FIN NFE OTH SAS )) {
         if( $maf_line{"ExAC_AC_AN_$subpop"} ) {
             my ( $subpop_ac ) = split( "/", $maf_line{"ExAC_AC_AN_$subpop"} );
@@ -777,7 +777,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         }
     }
     if( $subpop_count > 0 ) {
-        $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter,common_variant" );
+        $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter;common_variant" );
     }
     $maf_line{FILTER} = $filter;
 

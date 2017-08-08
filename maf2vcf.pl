@@ -53,7 +53,7 @@ unless( defined $output_vcf ) {
 
 # Before anything, let's parse the headers of this supposed "MAF-like" file and do some checks
 my $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open input MAF: $input_maf!\n";
-my ( %uniq_regions, %flanking_bps, @tn_pair, %col_idx, $header_line );
+my ( %uniq_regions, %filter_tags, %flanking_bps, @tn_pair, %col_idx, $header_line );
 while( my $line = $maf_fh->getline ) {
 
     # If the file uses Mac OS 9 newlines, quit with an error
@@ -89,10 +89,12 @@ while( my $line = $maf_fh->getline ) {
     ( %col_idx ) or die "ERROR: Couldn't find a header line (must start with Hugo_Symbol, Chromosome, or Tumor_Sample_Barcode): $input_maf\n";
 
     # For each variant in the MAF, parse out the locus for running samtools faidx later
-    my ( $chr, $pos, $ref ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele );
+    my ( $chr, $pos, $ref, $filter ) = map{ my $c = lc; ( defined $col_idx{$c} ? $cols[$col_idx{$c}] : "" )} qw( Chromosome Start_Position Reference_Allele FILTER );
     $ref =~ s/^(\?|-|0)+$//; # Blank out the dashes (or other weird chars) used with indels
     my $region = "$chr:" . ( $pos - 1 ) . "-" . ( $pos + length( $ref ));
     $uniq_regions{$region} = 1;
+    # Also track the unique FILTER tags seen, so we can construct VCF header lines for each
+    map{ $filter_tags{$_} = 1 unless( $_ eq "PASS" or $_ eq "." )} split( /,|;/, $filter );
 }
 $maf_fh->close;
 
@@ -152,6 +154,7 @@ while( my $line = $maf_fh->getline ) {
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic depths of REF and ALT(s) in the order listed\">\n";
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth across this site\">\n";
+                $tn_vcf{$vcf_file} .= "##FILTER=<ID=$_,Description=\"\">\n" foreach ( sort keys %filter_tags );
                 $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
             }
 
@@ -304,6 +307,7 @@ $vcf_fh->print( "##fileformat=VCFv4.2\n" );
 $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
 $vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
 $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
+$vcf_fh->print( "##FILTER=<ID=$_,Description=\"\">\n" ) foreach ( sort keys %filter_tags );
 $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @vcf_cols) . "\n" );
 
 # Write each variant into the multi-sample VCF

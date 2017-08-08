@@ -300,7 +300,7 @@ while( my $line = $vcf_in_fh->getline ) {
     # Add more filter tags to the FILTER field, if --add-filters was specified
     if( $add_filters ) {
         my %tags = ();
-        map{ $tags{$_} = 1 unless( $_ eq "PASS" or $_ eq "." )} split( ",", $filter );
+        map{ $tags{$_} = 1 unless( $_ eq "PASS" or $_ eq "." )} split( /,|;/, $filter );
         $tags{LowTotalDepth} = 1 if(( $tum_info{DP} ne "." and $tum_info{DP} < $min_tum_depth ) or ( $nrm_info{DP} ne "." and $nrm_info{DP} < $min_nrm_depth ));
         my @tum_depths = split( /,/, $tum_info{AD} );
         my @nrm_depths = split( /,/, $nrm_info{AD} );
@@ -308,7 +308,7 @@ while( my $line = $vcf_in_fh->getline ) {
         my $nrm_alt_depth = $nrm_depths[$var_allele_idx];
         $tags{LowTumorSupport} = 1 if( $tum_alt_depth ne "." and $tum_alt_depth < $min_tum_support );
         $tags{HighNormalSupport} = 1 if( $nrm_alt_depth ne "." and $nrm_alt_depth > $max_nrm_support );
-        my $tags_to_add = join( ",", sort keys %tags );
+        my $tags_to_add = join( ";", sort keys %tags );
         $filter = ( $tags_to_add ? $tags_to_add : $filter );
     }
 
