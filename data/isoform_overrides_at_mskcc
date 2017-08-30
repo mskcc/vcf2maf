@@ -1,4 +1,4 @@
-#isoform_override	gene_name	dmp_refseq_id	ccds_id
+#enst_id	gene_name	refseq_id	ccds_id
 ENST00000318560	ABL1	NM_005157.4	CCDS35166.1
 ENST00000263640	ACVR1	NM_001111067.2	CCDS2206.1
 ENST00000349310	AKT1	NM_001014431.1	CCDS9994.1
