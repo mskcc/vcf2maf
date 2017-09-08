@@ -58,7 +58,7 @@ RUN rm 85.zip
 WORKDIR /opt/variant_effect_predictor_85/ensembl-tools-release-85/scripts/variant_effect_predictor/
 RUN perl INSTALL.pl --AUTO ap --PLUGINS LoF --CACHEDIR /opt/variant_effect_predictor_85/cache
 WORKDIR /opt/variant_effect_predictor_85/cache/Plugins
-RUN wget https://raw.githubusercontent.com/konradjk/loftee/master/splice_module.pl
+RUN wget https://raw.githubusercontent.com/konradjk/loftee/v0.3-beta/splice_module.pl
 
 WORKDIR /opt
 ADD . /opt/vcf2maf 
