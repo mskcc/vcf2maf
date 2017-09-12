@@ -1,52 +1,22 @@
 #version 2.4
-Hugo_Symbol	Entrez_Gene_Id	Center	NCBI_Build	Chromosome	Start_Position	End_Position	Strand	Variant_Classification	Variant_Type	Reference_Allele	Tumor_Seq_Allele1	Tumor_Seq_Allele2	dbSNP_RS	dbSNP_Val_Status	Tumor_Sample_Barcode	Matched_Norm_Sample_Barcode	Match_Norm_Seq_Allele1	Match_Norm_Seq_Allele2	Tumor_Validation_Allele1	Tumor_Validation_Allele2	Match_Norm_Validation_Allele1	Match_Norm_Validation_Allele2	Verification_Status	Validation_Status	Mutation_Status	Sequencing_Phase	Sequence_Source	Validation_Method	Score	BAM_File	Sequencer	Tumor_Sample_UUID	Matched_Norm_Sample_UUID
-MTOR	0	.	GRCh37	1	11290179	11290179	+	Intron	DEL	A	A	-	rs35067541		TUMOR	NORMAL	A	A															
-Unknown	0	.	GRCh37	1	15557977	15557978	+	IGR	DNP	TG	TG	CA	novel		TUMOR	NORMAL	TG	TG															
-EIF4G3	0	.	GRCh37	1	21327992	21327992	+	Intron	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-FUCA1	0	.	GRCh37	1	24186225	24186225	+	Intron	SNP	A	A	G	novel		TUMOR	NORMAL	A	A															
-EXTL1	0	.	GRCh37	1	26351488	26351488	+	Intron	SNP	G	G	A	rs560524825		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	30306895	30306895	+	IGR	SNP	C	C	G	novel		TUMOR	NORMAL	C	C															
-Unknown	0	.	GRCh37	1	32064376	32064376	+	IGR	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	36983001	36983001	+	IGR	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-Unknown	0	.	GRCh37	1	37250738	37250738	+	IGR	SNP	G	G	T	novel		TUMOR	NORMAL	G	G															
-MTF1	0	.	GRCh37	1	38300420	38300420	+	Intron	SNP	C	C	T	rs377464875		TUMOR	NORMAL	C	C															
-KCNQ4	0	.	GRCh37	1	41250647	41250647	+	Intron	DEL	T	T	-	novel		TUMOR	NORMAL	T	T															
-NDC1	0	.	GRCh37	1	54250463	54250464	+	Intron	INS	-	-	A	novel		TUMOR	NORMAL	-	-															
-Unknown	0	.	GRCh37	1	69162958	69162958	+	IGR	SNP	G	G	A	rs568254319		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	70986559	70986559	+	IGR	SNP	G	G	T	novel		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	81625484	81625485	+	IGR	INS	-	-	T	novel		TUMOR	NORMAL	-	-															
-LPHN2	0	.	GRCh37	1	82031642	82031642	+	Intron	SNP	G	G	C	novel		TUMOR	NORMAL	G	G															
-DPYD	0	.	GRCh37	1	98305916	98305916	+	Intron	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-OLFM3	0	.	GRCh37	1	102308388	102308388	+	Intron	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	106684049	106684049	+	IGR	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-RAP1A	0	.	GRCh37	1	112196856	112196857	+	Intron	INS	-	-	T	novel		TUMOR	NORMAL	-	-															
-Unknown	0	.	GRCh37	1	113692629	113692629	+	IGR	SNP	C	C	A	novel		TUMOR	NORMAL	C	C															
-Unknown	0	.	GRCh37	1	120024283	120024283	+	IGR	SNP	G	G	C	novel		TUMOR	NORMAL	G	G															
-RP11-326G21.1	0	.	GRCh37	1	145018182	145018182	+	5'Flank	SNP	T	T	C	rs6413787		TUMOR	NORMAL	T	T															
-CHD1L	0	.	GRCh37	1	146728217	146728217	+	Splice_Site	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	149187688	149187688	+	IGR	DEL	A	A	-	novel		TUMOR	NORMAL	A	A															
-Unknown	0	.	GRCh37	1	164454678	164454679	+	IGR	INS	-	-	A	novel		TUMOR	NORMAL	-	-															
-PBX1	0	.	GRCh37	1	164572151	164572151	+	Intron	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-TMCO1	0	.	GRCh37	1	165725285	165725285	+	Intron	DEL	A	-	-	rs35055828		TUMOR	NORMAL	A	A															
-SLC9C2	0	.	GRCh37	1	173474915	173474915	+	Intron	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-CACNA1E	0	.	GRCh37	1	181586787	181586787	+	Intron	SNP	A	A	G	novel		TUMOR	NORMAL	A	A															
-LINC01035	0	.	GRCh37	1	188960198	188960198	+	Intron	SNP	C	C	G	novel		TUMOR	NORMAL	C	C															
-RP11-21J7.1	0	.	GRCh37	1	193683552	193683552	+	Intron	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-TNNT2	0	.	GRCh37	1	201336227	201336227	+	Intron	SNP	C	C	T	novel		TUMOR	NORMAL	C	C															
-ENSR00000672166	0	.	GRCh37	1	213098388	213098388	+	IGR	SNP	T	T	A	novel		TUMOR	NORMAL	T	T															
-KCNK2	0	.	GRCh37	1	215292803	215292803	+	Intron	SNP	C	C	G	novel		TUMOR	NORMAL	C	C															
-USH2A	0	.	GRCh37	1	216423512	216423512	+	Intron	SNP	G	G	A	rs773881072		TUMOR	NORMAL	G	G															
-Unknown	0	.	GRCh37	1	224077036	224077036	+	IGR	SNP	C	C	G	novel		TUMOR	NORMAL	C	C															
-DNAH14	0	.	GRCh37	1	225411875	225411875	+	Intron	SNP	C	C	T	rs11487470		TUMOR	NORMAL	C	C															
-GALNT2	0	.	GRCh37	1	230205767	230205768	+	Intron	INS	-	-	G	novel		TUMOR	NORMAL	-	-															
-RP4-781K5.4	0	.	GRCh37	1	234796397	234796397	+	RNA	SNP	A	A	G	novel		TUMOR	NORMAL	A	A															
-GNG4	0	.	GRCh37	1	235759161	235759161	+	Intron	SNP	C	C	T	rs149015010		TUMOR	NORMAL	C	C															
-HNRNPU	0	.	GRCh37	1	245021278	245021278	+	Intron	SNP	C	C	G	novel		TUMOR	NORMAL	C	C															
-Unknown	0	.	GRCh37	2	13668920	13668920	+	IGR	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-ENSR00001697763	0	.	GRCh37	2	19038279	19038279	+	IGR	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-ENSR00001697982	0	.	GRCh37	2	20732832	20732832	+	IGR	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-DNMT3A	0	.	GRCh37	2	25510708	25510709	+	Intron	INS	-	-	T	rs112621064		TUMOR	NORMAL	-	-															
-OTOF	0	.	GRCh37	2	26683689	26683689	+	Intron	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-AC109829.1	0	.	GRCh37	2	27786995	27786995	+	Intron	SNP	G	G	A	novel		TUMOR	NORMAL	G	G															
-KCNG3	0	.	GRCh37	2	42677533	42677533	+	Intron	SNP	G	G	T	novel		TUMOR	NORMAL	G	G															
-THADA	0	.	GRCh37	2	43559273	43559273	+	Intron	SNP	G	G	C	novel		TUMOR	NORMAL	G	G															
+Hugo_Symbol	Entrez_Gene_Id	Center	NCBI_Build	Chromosome	Start_Position	End_Position	Strand	Variant_Classification	Variant_Type	Reference_Allele	Tumor_Seq_Allele1	Tumor_Seq_Allele2	dbSNP_RS	dbSNP_Val_Status	Tumor_Sample_Barcode	Matched_Norm_Sample_Barcode	Match_Norm_Seq_Allele1	Match_Norm_Seq_Allele2	Tumor_Validation_Allele1	Tumor_Validation_Allele2	Match_Norm_Validation_Allele1	Match_Norm_Validation_Allele2	Verification_Status	Validation_Status	Mutation_Status	Sequencing_Phase	Sequence_Source	Validation_Method	Score	BAM_File	Sequencer	Tumor_Sample_UUID	Matched_Norm_Sample_UUID	t_depth	t_ref_count	t_alt_count	n_depth	n_ref_count	n_alt_count
+MTOR	2475	.	GRCh37	1	11290179	11290179	+	Intron	DEL	A	A	-	rs35067541		TUMOR	NORMAL	A	A																20	10	10	35	30	5
+Unknown	0	.	GRCh37	1	15557977	15557978	+	IGR	DNP	TG	TG	CA	novel		TUMOR	NORMAL	TG	TG																16	11	5	22	21	1
+CHD1L	9557	.	GRCh37	1	146728217	146728217	+	Splice_Site	SNP	G	G	A	novel		TUMOR	NORMAL	G	G																40	19	21	42	42	0
+INHA	3623	.	GRCh37	2	220439700	220439701	+	Frame_Shift_Ins	INS	-	-	CT	novel		TUMOR	NORMAL	-	-																93	21	72	51	51	0
+BAP1	8314	.	GRCh37	3	52437427	52437448	+	Splice_Site	DEL	CCCACCTGTCAGCGCCAGGGGA	CCCACCTGTCAGCGCCAGGGGA	-	novel		TUMOR	NORMAL	CCCACCTGTCAGCGCCAGGGGA	CCCACCTGTCAGCGCCAGGGGA																20	10	10	11	11	0
+BAP1	8314	.	GRCh37	3	52437702	52437708	+	Frame_Shift_Del	DEL	TGGGTGA	TGGGTGA	-	novel		TUMOR	NORMAL	TGGGTGA	TGGGTGA																20	10	10	11	11	0
+BAP1	8314	.	GRCh37	3	52443789	52443850	+	Splice_Region	DEL	TGGTCAGGCAGGCGCGTCCCGGGCCCATCCGGCCTCCCCAGCCCCTGGCCCTCCCGGTCCCC	TGGTCAGGCAGGCGCGTCCCGGGCCCATCCGGCCTCCCCAGCCCCTGGCCCTCCCGGTCCCC	-	novel		TUMOR	NORMAL	TGGTCAGGCAGGCGCGTCCCGGGCCCATCCGGCCTCCCCAGCCCCTGGCCCTCCCGGTCCCC	TGGTCAGGCAGGCGCGTCCCGGGCCCATCCGGCCTCCCCAGCCCCTGGCCCTCCCGGTCCCC																20	10	10	11	11	0
+PIK3CA	5290	.	GRCh37	3	178928219	178928220	+	In_Frame_Ins	INS	-	-	ATA			TUMOR	NORMAL	-	-																43	21	22	11	11	0
+TERT	7015	.	GRCh37	5	1295228	1295228	+	5'Flank	SNP	G	G	A	novel		TUMOR	NORMAL	G	G																20	10	10	11	11	0
+TERT	7015	.	GRCh37	5	1295250	1295250	+	5'Flank	SNP	G	G	A	novel		TUMOR	NORMAL	G	G																20	10	10	11	11	0
+MAP3K1	4214	.	GRCh37	5	56177849	56177851	+	In_Frame_Del	DEL	CAA	CAA	-	rs5868032		TUMOR	NORMAL	CAA	CAA																50	34	16	46	46	0
+APC	324	.	GRCh37	5	112174758	112174761	+	Frame_Shift_Del	DEL	AAGA	AAGA	-	novel		TUMOR	NORMAL	AAGA	AAGA																20	12	8	32	30	2
+APC	324	.	GRCh37	5	112174758	112174761	+	Frame_Shift_Del	DEL	AAGA	AAGA	GA	novel		TUMOR	NORMAL	AAGA	AAGA																20	12	8	32	30	2
+APC	324	.	GRCh37	5	112174758	112174761	+	Frame_Shift_Del	DEL	AAGA	GA	-	novel		TUMOR	NORMAL	-	-																20	0	8	32	0	2
+APC	324	.	GRCh37	5	112174758	112174761	+	Frame_Shift_Del	DEL	AAGA	AAGA	-	novel		TUMOR	NORMAL	AAGA	GA																20	12	8	32	30	0
+APC	324	.	GRCh37	5	112174758	112174761	+	Frame_Shift_Del	DEL	AAGA	AAGA	GA	novel		TUMOR	NORMAL	AAGA	-																20	12	8	32	30	0
+CCND3	896	.	GRCh37	6	41903782	41903783	+	Missense_Mutation	DNP	AG	AG	CA	rs386700585		TUMOR	NORMAL	AG	AG																50	28	22	48	48	0
+MET	4233	.	GRCh37	7	116412043	116412043	+	Missense_Mutation	SNP	G	G	C	novel		TUMOR	NORMAL	G	G																47	25	22	99	98	1
+FLT3	2322	.	GRCh37	13	28608242	28608243	+	In_Frame_Ins	INS	-	-	ACTCCCATTTGAGATCATATTCATATTCTCTGAAATCAACGTAGAAGTACTCATTACCCCCTCGGGGGG	novel		TUMOR	NORMAL	-	-																20	10	10	11	11	0
+TP53	7157	.	GRCh37	17	7579312	7579312	+	Splice_Region	SNP	C	C	A	rs55863639		TUMOR	NORMAL	C	C																42	20	22	19	18	1
