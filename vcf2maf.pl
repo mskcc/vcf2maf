@@ -251,7 +251,7 @@ my $input_name = substr( $input_vcf, rindex( $input_vcf, "/" ) + 1 );
 $input_name =~ s/(\.vcf)*$//;
 
 # If a liftOver chain was provided, remap and switch the input VCF before annotation
-my ( %remap, %remap_back );
+my ( %remap );
 if( $remap_chain ) {
     # Find out if liftOver is properly installed, and warn the user if it's not
     my $liftover = `which liftOver`;
@@ -261,7 +261,6 @@ if( $remap_chain ) {
     # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
     `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/$input_name.bed`;
     %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/$input_name.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
-    %remap_back = reverse %remap; # ::UNUSED:: For restoring original loci in the annotated VCF
     unlink( "$tmp_dir/$input_name.bed" );
 
     # Create a new VCF in the temp folder, with remapped loci on which we'll run annotation
@@ -279,6 +278,8 @@ if( $remap_chain ) {
             my @cols = split( "\t", $line );
             my $locus = $cols[0] . ":" . $cols[1];
             if( defined $remap{$locus} ) {
+                # Retain original variant under INFO, so we can append it later to the output MAF
+                $cols[7] = ( !$cols[7] or $cols[7] eq "." ? "" : "$cols[7];" ) . "REMAPPED_POS=" . join( ":", @cols[0,1,3,4] );
                 @cols[0,1] = split( ":", $remap{$locus} );
                 $remap_vcf_fh->print( join( "\t", @cols ), "\n" );
             }
@@ -426,10 +427,12 @@ push( @maf_header, @ann_cols );
 
 # If the user has INFO fields they want to retain, create additional columns for those
 my @addl_info_cols = ();
-if( $retain_info ) {
+if( $retain_info or $remap_chain ) {
     # But let's not overwrite existing columns with the same name
     my %maf_cols = map{ my $c = lc; ( $c, 1 )} @maf_header;
     @addl_info_cols = grep{ my $c = lc; !$maf_cols{$c}} split( ",", $retain_info );
+    # If a remap-chain was used, add a column to retain the original chr:pos:ref:alt
+    push( @addl_info_cols, "REMAPPED_POS" ) if( $remap_chain );
     push( @maf_header, @addl_info_cols );
 }
 
