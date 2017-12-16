@@ -406,6 +406,13 @@ sub FixAlleleDepths {
     elsif( !defined $fmt_info{AD} and defined $fmt_info{AO} and defined $fmt_info{RO} ) {
         @depths = ( $fmt_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AO} ));
     }
+    # Handle VCF lines from Delly where REF/ALT SV junction read counts are in RR/RV respectively
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{RR} and defined $fmt_info{RV} ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[0] = $fmt_info{RR};
+        $depths[$var_allele_idx] = $fmt_info{RV};
+    }
     # Handle VCF lines from cgpPindel, where ALT depth and total depth are in PP:NP:PR:NR
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/PP NP PR NR/ ) == 4 ) {
         # Reference allele depth and depths for any other ALT alleles must be left undefined

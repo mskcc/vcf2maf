@@ -7,6 +7,7 @@ use warnings;
 use IO::File;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
+use File::Copy qw( move );
 use File::Path qw( mkpath );
 use Config;
 
@@ -221,7 +222,7 @@ pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
 # Check if required arguments are missing or problematic
-( defined $input_vcf ) or die "ERROR: --input-vcf must be defined!\n";
+( defined $input_vcf and defined $output_maf ) or die "ERROR: Both input-vcf and output-maf must be defined!\n";
 ( -s $input_vcf ) or die "ERROR: Provided --input-vcf is missing or empty: $input_vcf\n";
 ( -s $ref_fasta ) or die "ERROR: Provided --ref-fasta is missing or empty: $ref_fasta\n";
 ( $input_vcf !~ m/\.(gz|bz2|bcf)$/ ) or die "ERROR: Unfortunately, --input-vcf cannot be in a compressed format\n";
@@ -250,6 +251,55 @@ else {
 my $input_name = substr( $input_vcf, rindex( $input_vcf, "/" ) + 1 );
 $input_name =~ s/(\.vcf)*$//;
 
+# If the VCF contains SVs, split the breakpoints into separate lines before passing to VEP
+my $split_svs = 0;
+my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
+my $split_vcf_fh = IO::File->new( "$tmp_dir/$input_name.split.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.split.vcf!\n";
+while( my $line = $orig_vcf_fh->getline ) {
+    # If the file uses Mac OS 9 newlines, quit with an error
+    ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
+
+    if( $line =~ m/^#/ ) {
+        $split_vcf_fh->print( $line ); # Write header lines unchanged
+        next;
+    }
+
+    chomp( $line );
+    my @cols = split( "\t", $line );
+    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $cols[7] );
+    if( $info{SVTYPE} ){
+        # Remove SVTYPE tag if REF/ALT alleles are defined, or VEP won't report transcript effects
+        if( $cols[3]=~m/^[ACGTN]+$/ and $cols[4]=~m/^[ACGTN]+$/ ) {
+            $cols[7]=~s/(SVTYPE=\w+;|;SVTYPE=\w+|SVTYPE=\w+)//;
+            $split_vcf_fh->print( join( "\t", @cols ), "\n" );
+        }
+        # For legit SVs except insertions, split them into two separate breakpoint events
+        elsif( $info{SVTYPE}=~m/^(BND|TRA|DEL|DUP|INV)$/ ) {
+            $split_svs = 1;
+            # Don't tell VEP it's an SV, by removing the SVTYPE tag
+            $cols[7]=~s/(SVTYPE=\w+;|;SVTYPE=\w+|SVTYPE=\w+)//;
+            # Rename two SV specific INFO keys to something friendlier
+            $cols[7]=~s/CT=([35]to[35])/Frame=$1/;
+            $cols[7]=~s/SVMETHOD=([\w.]+)/Method=$1/;
+            $cols[4] = "<" . $info{SVTYPE} . ">";
+            # Fetch the REF allele at the second breakpoint using samtools faidx
+            my $ref2 = `$samtools faidx $ref_fasta $info{CHR2}:$info{END}-$info{END} | grep -v ^\\>`;
+            chomp( $ref2 );
+            $split_vcf_fh->print( join( "\t", $info{CHR2}, $info{END}, $cols[2], ( $ref2 ? $ref2 : $cols[3] ), @cols[4..$#cols] ), "\n" );
+            $split_vcf_fh->print( join( "\t", @cols ), "\n" );
+        }
+        $input_vcf = "$tmp_dir/$input_name.split.vcf";
+    }
+    else {
+        $split_vcf_fh->print( join( "\t", @cols ), "\n" );
+    }
+}
+$split_vcf_fh->close;
+$orig_vcf_fh->close;
+
+# Delete the split.vcf created above if we didn't find any variants with the SVTYPE tag
+unlink( "$tmp_dir/$input_name.split.vcf" ) if( $input_vcf ne "$tmp_dir/$input_name.split.vcf" );
+
 # If a liftOver chain was provided, remap and switch the input VCF before annotation
 my ( %remap );
 if( $remap_chain ) {
@@ -267,9 +317,6 @@ if( $remap_chain ) {
     my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
     my $remap_vcf_fh = IO::File->new( "$tmp_dir/$input_name.remap.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.remap.vcf!\n";
     while( my $line = $orig_vcf_fh->getline ) {
-        # If the file uses Mac OS 9 newlines, quit with an error
-        ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
-
         if( $line =~ m/^#/ ) {
             $remap_vcf_fh->print( $line ); # Write header lines unchanged
         }
@@ -298,9 +345,6 @@ if( $remap_chain ) {
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
 my ( %ref_bps, @ref_regions, %uniq_loci, %uniq_regions, %flanking_bps, %filter_data );
 while( my $line = $vcf_fh->getline ) {
-    # If the file uses Mac OS 9 newlines, quit with an error
-    ( $line !~ m/\r$/ ) or die "ERROR: Your VCF uses CR line breaks, which we can't support. Please use LF or CRLF.\n";
-
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
     chomp( $line );
@@ -427,12 +471,14 @@ push( @maf_header, @ann_cols );
 
 # If the user has INFO fields they want to retain, create additional columns for those
 my @addl_info_cols = ();
-if( $retain_info or $remap_chain ) {
+if( $retain_info or $remap_chain or $split_svs ) {
     # But let's not overwrite existing columns with the same name
     my %maf_cols = map{ my $c = lc; ( $c, 1 )} @maf_header;
     @addl_info_cols = grep{ my $c = lc; !$maf_cols{$c}} split( ",", $retain_info );
     # If a remap-chain was used, add a column to retain the original chr:pos:ref:alt
     push( @addl_info_cols, "REMAPPED_POS" ) if( $remap_chain );
+    # If we had to split some SVs earlier, add some columns with some useful info about SVs
+    push( @addl_info_cols, qw( Fusion Method Frame CONSENSUS )) if( $split_svs );
     push( @maf_header, @addl_info_cols );
 }
 
@@ -448,12 +494,11 @@ if( -s $entrez_id_file ) {
 
 # Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
 # one transcript per variant whose annotation will be used in the MAF
-my $maf_fh = *STDOUT; # Use STDOUT if an output MAF file was not defined
-$maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open --output-maf: $output_maf!\n" if( $output_maf );
+my $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open --output-maf: $output_maf!\n";
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
 ( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
 my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
-my ( $vcf_tumor_idx, $vcf_normal_idx );
+my ( $vcf_tumor_idx, $vcf_normal_idx, %sv_pair );
 while( my $line = $annotated_vcf_fh->getline ) {
 
     # Parse out the VEP CSQ/ANN format, which seems to differ between runs
@@ -699,7 +744,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
         # ::NOTE:: MAF only supports biallelic sites. Tumor_Seq_Allele2 must always be the $var
         # picked earlier. For Tumor_Seq_Allele1, pick the first non-var allele in GT (usually $ref)
         my ( $idx1, $idx2 ) = split( /[\/|]/, $tum_info{GT} );
-        # If GT was monoploid, then $idx2 will undefined, and we should set it equal to $idx1
+        # If GT was monoploid, then $idx2 will be undefined, and we should set it equal to $idx1
         $idx2 = $idx1 unless( defined $idx2 );
         $maf_line{Tumor_Seq_Allele1} = ( $alleles[$idx1] ne $var ? $alleles[$idx1] : $alleles[$idx2] );
     }
@@ -797,11 +842,57 @@ while( my $line = $annotated_vcf_fh->getline ) {
         $maf_line{$info_col} = ( $info{$info_col} ? $info{$info_col} : "" );
     }
 
+    # If this is an SV, pair up gene names from separate lines to backfill the Fusion column later
+    if( $split_svs and $var=~m/^<BND|DEL|DUP|INV>$/ ) {
+        my $sv_key = "$var_id-$tumor_id";
+        if( $sv_pair{$sv_key} ) {
+            $sv_pair{$sv_key} = $sv_pair{$sv_key} . "-" . $maf_line{Hugo_Symbol} . " fusion";
+        }
+        else {
+            $sv_pair{$sv_key} = $maf_line{Hugo_Symbol};
+        }
+    }
+
     # At this point, we've generated all we can about this variant, so write it to the MAF
     $maf_fh->print( join( "\t", map{( defined $maf_line{$_} ? $maf_line{$_} : "" )} @maf_header ) . "\n" );
 }
-$maf_fh->close if( $output_maf );
+$maf_fh->close;
 $annotated_vcf_fh->close;
+
+# If the MAF lists SVs, backfill the Fusion column with gene-pair names
+if( $split_svs ) {
+    my $output_name = substr( $output_maf, rindex( $output_maf, "/" ) + 1 );
+    $output_name =~ s/(\.maf)*$//;
+    my $tmp_output_maf = "$tmp_dir/$output_name.tmp.maf";
+
+    my $in_maf_fh = IO::File->new( $output_maf ) or die "ERROR: Couldn't open: $output_maf!\n";
+    my $out_maf_fh = IO::File->new( $tmp_output_maf, ">" ) or die "ERROR: Couldn't open: $tmp_output_maf!\n";
+    my ( $tid_idx, $fusion_idx, $var_id_idx ) = ( 0, 0, 0 );
+    while( my $line = $in_maf_fh->getline ) {
+        chomp( $line );
+        if( $line =~ m/^#/ ) {
+            $out_maf_fh->print( "$line\n" ); # Copy comments unchanged
+        }
+        elsif( $line =~ m/^Hugo_Symbol/ ) {
+            # Copy the header unchanged, after figuring out necessary column indexes
+            foreach( split( /\t/, $line )) { last if( $_ eq "Tumor_Sample_Barcode" ); ++$tid_idx; }
+            foreach( split( /\t/, $line )) { last if( $_ eq "Fusion" ); ++$fusion_idx; }
+            foreach( split( /\t/, $line )) { last if( $_ eq "variant_id" ); ++$var_id_idx; }
+            $out_maf_fh->print( "$line\n" ); # Copy header unchanged
+        }
+        else {
+            # Write the gene-pair name into the Fusion column if it was backfilled earlier
+            my @cols = split( /\t/, $line );
+            my $sv_key = $cols[$var_id_idx] . "-" . $cols[$tid_idx];
+            $cols[$fusion_idx] = $sv_pair{$sv_key} if( $sv_pair{$sv_key} );
+            $out_maf_fh->print( join( "\t", @cols ) . "\n" );
+        }
+    }
+    $out_maf_fh->close;
+    $in_maf_fh->close;
+
+    move( $tmp_output_maf, $output_maf );
+}
 
 # Converts Sequence Ontology variant types to MAF variant classifications
 sub GetVariantClassification {
@@ -884,6 +975,13 @@ sub FixAlleleDepths {
     elsif( !defined $fmt_info{AD} and defined $fmt_info{AO} and defined $fmt_info{RO} ) {
         @depths = ( $fmt_info{RO}, map{( m/^\d+$/ ? $_ : "" )}split( /,/, $fmt_info{AO} ));
     }
+    # Handle VCF lines from Delly where REF/ALT SV junction read counts are in RR/RV respectively
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{RR} and defined $fmt_info{RV} ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        $depths[0] = $fmt_info{RR};
+        $depths[$var_allele_idx] = $fmt_info{RV};
+    }
     # Handle VCF lines from cgpPindel, where ALT depth and total depth are in PP:NP:PR:NR
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/PP NP PR NR/ ) == 4 ) {
         # Reference allele depth and depths for any other ALT alleles must be left undefined
@@ -950,7 +1048,7 @@ __DATA__
 =head1 OPTIONS
 
  --input-vcf      Path to input file in VCF format
- --output-maf     Path to output MAF file [Default: STDOUT]
+ --output-maf     Path to output MAF file
  --tmp-dir        Folder to retain intermediate VCFs after runtime [Default: Folder containing input VCF]
  --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
  --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
