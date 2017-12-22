@@ -269,7 +269,7 @@ while( my $line = $orig_vcf_fh->getline ) {
     my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $cols[7] );
     if( $info{SVTYPE} ){
         # Remove SVTYPE tag if REF/ALT alleles are defined, or VEP won't report transcript effects
-        if( $cols[3]=~m/^[ACGTN]+$/i and $cols[4]=~m/^[ACGTN]+$/i ) {
+        if( $cols[3]=~m/^[ACGTN]+$/i and $cols[4]=~m/^[ACGTN,]+$/i ) {
             $cols[7]=~s/(SVTYPE=\w+;|;SVTYPE=\w+|SVTYPE=\w+)//;
             $split_vcf_fh->print( join( "\t", @cols ), "\n" );
         }
