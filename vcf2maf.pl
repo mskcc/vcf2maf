@@ -839,7 +839,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
 
     # If there are additional INFO data to add, then add those
     foreach my $info_col ( @addl_info_cols ) {
-        $maf_line{$info_col} = ( $info{$info_col} ? $info{$info_col} : "" );
+        $maf_line{$info_col} = ( defined $info{$info_col} ? $info{$info_col} : "" );
     }
 
     # If this is an SV, pair up gene names from separate lines to backfill the Fusion column later
@@ -882,7 +882,7 @@ if( $split_svs ) {
         }
         else {
             # Write the gene-pair name into the Fusion column if it was backfilled earlier
-            my @cols = split( /\t/, $line );
+            my @cols = split( /\t/, $line, -1 );
             my $sv_key = $cols[$var_id_idx] . "-" . $cols[$tid_idx];
             $cols[$fusion_idx] = $sv_pair{$sv_key} if( $sv_pair{$sv_key} );
             $out_maf_fh->print( join( "\t", @cols ) . "\n" );
