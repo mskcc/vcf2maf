@@ -533,11 +533,20 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Parse out the data in the info column, and store into a hash
     my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
 
-    # By default, the variant allele is the first (usually the only) allele listed under ALT
-    # If there are multiple ALT alleles, choose the allele specified in the tumor GT field
-    # If tumor GT is undefined or ambiguous, choose the one with the most supporting read depth
+    # By default, the variant allele is the first (usually the only) allele listed under ALT. If
+    # there are >1 alleles in ALT, choose the first non-REF allele listed under tumor GT, that is
+    # also not seen under normal GT. If tumor GT is undefined or ambiguous, choose the tumor allele
+    # with the most supporting read depth, if available.
     my @alleles = ( $ref, split( /,/, $alt ));
     my $var_allele_idx = 1;
+
+    # Parse out info from the normal genotype field
+    my ( %nrm_info, @nrm_depths );
+    if( defined $vcf_normal_idx ) {
+        my @format_keys = split( /\:/, $format_line );
+        my $idx = 0;
+        %nrm_info = map {( $format_keys[$idx++], $_ )} split( /\:/, $rest[$vcf_normal_idx] );
+    }
 
     # Parse out info from the tumor genotype field
     my ( %tum_info, @tum_depths );
@@ -548,9 +557,14 @@ while( my $line = $annotated_vcf_fh->getline ) {
 
         # If possible, parse the tumor genotype to identify the variant allele
         if( defined $tum_info{GT} and $tum_info{GT} ne "." and $tum_info{GT} ne "./." ) {
-            my @genotype = split( /[\/|]/, $tum_info{GT} );
-            # In case of polyploid calls, choose the first non-REF allele, if any
-            ( $var_allele_idx ) = grep {$_ ne "0"} @genotype;
+            my @tum_gt = split( /[\/|]/, $tum_info{GT} );
+            # Default to the first non-REF allele seen in tumor GT
+            ( $var_allele_idx ) = grep {$_ ne "0"} @tum_gt;
+            # If possible, choose the first non-REF tumor allele that is also not in normal GT
+            if( defined $nrm_info{GT} and $nrm_info{GT} ne "." and $nrm_info{GT} ne "./." ) {
+                my %nrm_gt = map {( $_, 1 )} split( /[\/|]/, $nrm_info{GT} );
+                ( $var_allele_idx ) = grep {$_ ne "0" and !$nrm_gt{$_}} @tum_gt;
+            }
             # If GT was unhelpful, default to the first ALT allele and set GT to undefined
             if( !defined $var_allele_idx or $var_allele_idx !~ m/^\d+$/ or $var_allele_idx >= scalar( @alleles )) {
                 $var_allele_idx = 1;
@@ -558,7 +572,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             }
         }
 
-        # Standardize AD and DP based on data in the genotype fields
+        # Standardize tumor AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%tum_info );
         @tum_depths = split( ",", $tum_info{AD} );
 
@@ -579,14 +593,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Set the variant allele to whatever we selected above
     my $var = $alleles[$var_allele_idx];
 
-    # Same as above, parse out info from the normal genotype field
-    my ( %nrm_info, @nrm_depths );
+    # Standardize normal AD and DP based on data in the genotype fields
     if( defined $vcf_normal_idx ) {
-        my @format_keys = split( /\:/, $format_line );
-        my $idx = 0;
-        %nrm_info = map {( $format_keys[$idx++], $_ )} split( /\:/, $rest[$vcf_normal_idx] );
-
-        # Standardize AD and DP based on data in the genotype fields
         FixAlleleDepths( \@alleles, $var_allele_idx, \%nrm_info );
         @nrm_depths = split( ",", $nrm_info{AD} );
         $nrm_info{GT} = "./." unless( defined $nrm_info{GT} and $nrm_info{GT} ne '.' );
@@ -754,7 +762,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     if( defined $nrm_info{GT} and $nrm_info{GT} ne "." and $nrm_info{GT} ne "./." ) {
         # ::NOTE:: MAF only supports biallelic sites. So choose the first two alleles listed in GT
         my ( $idx1, $idx2 ) = split( /[\/|]/, $nrm_info{GT} );
-        # If GT was monoploid, then $idx2 will undefined, and we should set it equal to $idx1
+        # If GT was monoploid, then $idx2 will be undefined, and we should set it equal to $idx1
         $idx2 = $idx1 unless( defined $idx2 );
         $maf_line{Match_Norm_Seq_Allele1} = $alleles[$idx1];
         $maf_line{Match_Norm_Seq_Allele2} = $alleles[$idx2];
@@ -953,10 +961,9 @@ sub FixAlleleDepths {
 
         # If the only ALT allele is N, then set it to the allele with the highest non-ref readcount
         if( scalar( @alleles ) == 2 and $alleles[1] eq "N" ) {
-            $var_allele_idx = 1;
             my %acgt_depths = map{( defined $fmt_info{$_.'U'} ? ( $_, $fmt_info{$_.'U'} ) : ( $_, "" ))} qw( A C G T );
             my @deepest = sort {$acgt_depths{$b} <=> $acgt_depths{$a}} keys %acgt_depths;
-            ( $alleles[$var_allele_idx] ) = ( $deepest[0] ne $alleles[0] ? $deepest[0] : $deepest[1] );
+            ( $alleles[1] ) = ( $deepest[0] ne $alleles[0] ? $deepest[0] : $deepest[1] );
         }
         @depths = map{( defined $fmt_info{$_.'U'} ? $fmt_info{$_.'U'} : "" )} @alleles;
     }
