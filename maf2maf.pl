@@ -17,7 +17,7 @@ my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_al
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/86_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 0.7, 10 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 10 );
 my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
@@ -267,7 +267,8 @@ if( $retain_cols ) {
         else {
             # Extract minimal variant info, and figure out which of the tumor alleles is non-REF
             my ( $chr, $pos, $ref, $al1, $al2, $sample_id ) = map{ my $c = lc; ( defined $input_maf_col_idx{$c} ? $cols[$input_maf_col_idx{$c}] : "" ) } qw( Chromosome Start_Position Reference_Allele Tumor_Seq_Allele1 Tumor_Seq_Allele2 Tumor_Sample_Barcode );
-            my $var = (( defined $al1 and $al1 and $al1 ne $ref ) ? $al1 : $al2 );
+            # Prefer Tumor_Seq_Allele2 over Tumor_Seq_Allele1 if both are non-REF
+            my $var = (( defined $al2 and $al2 and $al2 ne $ref ) ? $al2 : $al1 );
 
             # Remove any prefixed reference bps from alleles, using "-" for simple indels
             while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
@@ -277,10 +278,10 @@ if( $retain_cols ) {
 
             # Create a key for this variant using Chromosome:Start_Position:Tumor_Sample_Barcode:Reference_Allele:Variant_Allele
             my $key = join( ":", $chr, $pos, $sample_id, $ref, $var );
+            %{$input_maf_data{$key}} = ();
 
             # Store values for this variant into a hash, adding column names to the key
             foreach my $c ( map{lc} split( ",", $retain_cols )) {
-                $input_maf_data{$key}{$c} = "";
                 if( defined $input_maf_col_idx{$c} and defined $cols[$input_maf_col_idx{$c}] ) {
                     $input_maf_data{$key}{$c} = $cols[$input_maf_col_idx{$c}];
                 }
@@ -319,7 +320,7 @@ if( $retain_cols ) {
                 my $key = join( ":", map{ my $c = lc; $cols[$output_maf_col_idx{$c}] } qw( Chromosome Start_Position Tumor_Sample_Barcode Reference_Allele Tumor_Seq_Allele2 ));
                 foreach my $c ( map{lc} split( /\t/, $maf_header )){
                     if( !$force_new_cols{$c} ) {
-                        $cols[$output_maf_col_idx{$c}] = ( defined $input_maf_data{$key}{$c} ? $input_maf_data{$key}{$c} : "" );
+                        $cols[$output_maf_col_idx{$c}] = $input_maf_data{$key}{$c} if( defined $input_maf_data{$key}{$c} );
                     }
                 }
                 $tmp_tn_maf_fh->print( join( "\t", @cols ) . "\n" );

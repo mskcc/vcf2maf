@@ -201,8 +201,13 @@ while( my $line = $maf_fh->getline ) {
     $al1 = $ref if( $al1 eq "" );
     $al2 = $ref if( $al2 eq "" );
 
-    # Handle a case when $al1 is a SNP we want to annotate, but $al2 is incorrectly "-"
-    ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq "-" );
+    # When variant alleles are a SNP and a "-", warn user of misusing "-" to denote REF
+    if( $al1 ne $ref and $al2 ne $ref and $al1 ne $al2 and ( $al1 eq "-" or $al2 eq "-" ) and
+        length( $al1 ) == 1 and length( $al2 ) == 1 and length( $ref ) == 1 ) {
+        $al1 = $ref if( $al1 eq "-" );
+        $al2 = $ref if( $al2 eq "-" );
+        warn "WARNING: Replacing '-' with reference allele in: $line";
+    }
 
     # Blank out the dashes (or other weird chars) used with indels
     ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
