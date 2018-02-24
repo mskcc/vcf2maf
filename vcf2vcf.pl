@@ -13,7 +13,7 @@ use File::Temp qw( tempdir );
 # Set any default paths and constants
 my ( $vcf_tumor_id, $vcf_normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $add_header, $add_info ) = ( "", "" );
-my ( $retain_info, $retain_format ) = ( "SOMATIC,SS,I16,MQSB", "GT,DP,AD" );
+my ( $retain_info, $retain_format ) = ( "SOMATIC,SS,I16,MQSB", "GT,AD,DP" );
 
 # Find out if samtools and bcftools are properly installed, and warn the user if it's not
 my ( $samtools ) = map{chomp; $_}`which samtools`;
@@ -490,7 +490,7 @@ __DATA__
  --add-header     VCF-style header lines to add to the output VCF; Use "\n" to separate lines []
  --add-info       Comma-delimited tag=value pairs to add as INFO fields in the output VCF []
  --retain-info    Comma-delimited names of INFO fields to retain in output VCF [SOMATIC,SS,I16,MQSB]
- --retain-format  Comma-delimited names of FORMATted genotype fields to retain in output VCF [GT,DP,AD,ADF,ADR]
+ --retain-format  Comma-delimited names of FORMATted genotype fields to retain in output VCF [GT,AD,DP]
  --remap-chain    Chain file to remap variants to a different assembly before standardizing VCF
  --add-filters    Use this to add some extra tags under FILTER [Default: 0]
  --help           Print a brief help message and quit
@@ -498,7 +498,7 @@ __DATA__
 
 =head1 DESCRIPTION
 
-The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a VCF with only important fields in INFO and FORMAT, like GT:DP:AD. You may optionally specify --add-filters, to use these allele depths and fractions to add more tags under FILTER.
+The VCF files that variant callers generate are rarely compliant with VCF specifications. This script fixes the most serious grievances, and creates a VCF with only important fields in INFO and FORMAT, like GT:AD:DP. You may optionally specify --add-filters, to use these allele depths and fractions to add more tags under FILTER.
 
 =head2 Relevant links:
 
