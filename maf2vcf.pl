@@ -256,7 +256,8 @@ while( my $line = $maf_fh->getline ) {
     # Set tumor and normal genotypes (FORMAT tag GT in VCF)
     my ( $t_gt, $n_gt ) = ( "0/1", "0/0" ); # Set defaults
     $t_gt = join( "/", $al_idx{$al2}, $al_idx{$al1} ) if( $al_idx{$al1} ne "0" );
-    $n_gt = join( "/", $al_idx{$n_al2}, $al_idx{$n_al1} ) if( $al_idx{$n_al1} ne "0" or $al_idx{$n_al2} ne "0" );
+    $n_gt = join( "/", $al_idx{$n_al2}, $al_idx{$n_al1} ) if( $al_idx{$n_al1} ne "0" );
+    $n_gt = join( "/", $al_idx{$n_al1}, $al_idx{$n_al2} ) if( $al_idx{$n_al2} ne "0" );
 
     # Create the VCF's comma-delimited ALT field that must list all non-REF (variant) alleles
     my $alt = join( ",", @alleles[1..$#alleles] );
