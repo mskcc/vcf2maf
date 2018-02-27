@@ -105,6 +105,15 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 121. ExAC_AC_AN_OTH - Other Allele Count and Number from ExAC
 122. ExAC_AC_AN_SAS - South Asian Allele Count and Number from ExAC
 123. ExAC_FILTER - FILTER tags retrieved from ExAC VCF; PASS means ExAC thinks it's germline
+124. gnomAD_AF - Frequency of existing variant in gnomAD exomes combined population
+125. gnomAD_AFR_AF - Frequency of existing variant in gnomAD exomes African/American population
+126. gnomAD_AMR_AF - Frequency of existing variant in gnomAD exomes American population
+127. gnomAD_ASJ_AF - Frequency of existing variant in gnomAD exomes Ashkenazi Jewish population
+128. gnomAD_EAS_AF - Frequency of existing variant in gnomAD exomes East Asian population
+129. gnomAD_FIN_AF - Frequency of existing variant in gnomAD exomes Finnish population
+130. gnomAD_NFE_AF - Frequency of existing variant in gnomAD exomes Non-Finnish European population
+131. gnomAD_OTH_AF - Frequency of existing variant in gnomAD exomes combined other combined populations
+132. gnomAD_SAS_AF - Frequency of existing variant in gnomAD exomes South Asian population
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 
