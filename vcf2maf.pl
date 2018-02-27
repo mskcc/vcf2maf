@@ -686,7 +686,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             if( defined $effect{HGVSp_Short} and $effect{HGVSp_Short} eq "p.=" ) {
                 my ( $p_pos ) = $effect{Protein_position} =~ m/^(\d+)(-\d+)?\/\d+$/;
                 my $aa = $effect{Amino_acids};
-                $effect{HGVSp_Short} = "p.$aa" . $p_pos . $aa;
+                $effect{HGVSp_Short} = "p.$aa" . $p_pos . "=";
             }
 
             # Copy VEP data into MAF fields that don't share the same identifier

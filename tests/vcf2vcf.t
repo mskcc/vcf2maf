@@ -15,7 +15,7 @@ use Test::Simple tests => 4;
 ok( system( "perl vcf2vcf.pl --help > /dev/null" ) == 0 );
 ok( system( "perl vcf2vcf.pl --man > /dev/null" ) == 0 );
 ok( system( "perl vcf2vcf.pl --input-vcf tests/test.vcf --output-vcf tests/test_grch38.new.vcf --remap-chain data/GRCh37_to_GRCh38.chain" ) == 0 );
-ok( system( "diff tests/test_grch38.vcf tests/test_grch38.new.vcf" ) == 0 );
+ok( system( "bash -c 'diff <(grep -v ^##fileDate tests/test_grch38.vcf) <(grep -v ^##fileDate tests/test_grch38.new.vcf)'" ) == 0 );
 
 # Cleanup
 system( "rm -f tests/test_grch38.new.vcf" );
