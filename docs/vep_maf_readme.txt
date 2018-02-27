@@ -58,15 +58,15 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 74. EXON - the exon number (out of total number)
 75. INTRON - the intron number (out of total number)
 76. DOMAINS - the source and identifier of any overlapping protein domains
-77. GMAF - Non-reference allele and frequency of existing variant in 1000 Genomes
-78. AFR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined African population
-79. AMR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined American population
-80. ASN_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined Asian population
-81. EAS_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined East Asian population
-82. EUR_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined European population
-83. SAS_MAF - Non-reference allele and frequency of existing variant in 1000 Genomes combined South Asian population
-84. AA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP African American population
-85. EA_MAF - Non-reference allele and frequency of existing variant in NHLBI-ESP European American population
+77. AF - Non-reference allele and frequency of existing variant in 1000 Genomes
+78. AFR_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined African population
+79. AMR_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined American population
+80. ASN_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined Asian population
+81. EAS_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined East Asian population
+82. EUR_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined European population
+83. SAS_AF - Non-reference allele and frequency of existing variant in 1000 Genomes combined South Asian population
+84. AA_AF - Non-reference allele and frequency of existing variant in NHLBI-ESP African American population
+85. EA_AF - Non-reference allele and frequency of existing variant in NHLBI-ESP European American population
 86. CLIN_SIG - clinical significance of variant from dbSNP
 87. SOMATIC - somatic status of each ID reported under Existing_variation
 88. PUBMED - pubmed ID(s) of publications that cite existing variant
