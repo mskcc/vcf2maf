@@ -117,6 +117,12 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
 ( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your MAF: $ref_fasta\n";
 
+# Create VCF header lines for the reference FASTA, its contigs, and their lengths
+my $ref_fai = $ref_fasta . ".fai";
+`$samtools faidx $ref_fasta` unless( -s $ref_fai );
+my @ref_contigs = map { chomp; my ($chr, $len)=split("\t"); "##contig=<ID=$chr,length=$len>\n" } `cut -f1,2 $ref_fai | sort -k1,1V`;
+my $ref_header = "##reference=file://$ref_fasta\n" . join( "", @ref_contigs );
+
 # Parse through each variant in the MAF, and fill up the respective per-sample VCFs
 $maf_fh = IO::File->new( $input_maf ) or die "ERROR: Couldn't open file: $input_maf\n";
 my %tn_vcf = (); # In-memory cache to speed up writing per-TN pair VCFs
@@ -151,8 +157,9 @@ while( my $line = $maf_fh->getline ) {
             if( $per_tn_vcfs ) {
                 my $vcf_file = "$output_dir/$t_id\_vs_$n_id.vcf";
                 $tn_vcf{$vcf_file} .= "##fileformat=VCFv4.2\n";
+                $tn_vcf{$vcf_file} .= $ref_header;
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
-                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic depths of REF and ALT(s) in the order listed\">\n";
+                $tn_vcf{$vcf_file} .= "##FORMAT=<ID=AD,Number=R,Type=Integer,Description=\"Allelic depths of REF and ALT(s) in the order listed\">\n";
                 $tn_vcf{$vcf_file} .= "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth across this site\">\n";
                 $tn_vcf{$vcf_file} .= "##FILTER=<ID=$_,Description=\"\">\n" foreach ( sort keys %filter_tags );
                 $tn_vcf{$vcf_file} .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$t_id\t$n_id\n";
@@ -310,8 +317,9 @@ if( $per_tn_vcfs ) {
 my @vcf_cols = sort { $vcf_col_idx{$a} <=> $vcf_col_idx{$b} } keys %vcf_col_idx;
 my $vcf_fh = IO::File->new( $output_vcf, ">" ) or die "ERROR: Fail to create file $output_vcf\n";
 $vcf_fh->print( "##fileformat=VCFv4.2\n" );
+$vcf_fh->print( $ref_header );
 $vcf_fh->print( "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" );
-$vcf_fh->print( "##FORMAT=<ID=AD,Number=G,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
+$vcf_fh->print( "##FORMAT=<ID=AD,Number=R,Type=Integer,Description=\"Allelic Depths of REF and ALT(s) in the order listed\">\n" );
 $vcf_fh->print( "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n" );
 $vcf_fh->print( "##FILTER=<ID=$_,Description=\"\">\n" ) foreach ( sort keys %filter_tags );
 $vcf_fh->print( "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" . join("\t", @vcf_cols) . "\n" );
