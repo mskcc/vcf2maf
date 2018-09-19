@@ -899,7 +899,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     foreach my $fmt_col ( @addl_fmt_cols ) {
         my $fmt_key = $fmt_col;
         if ( $fmt_key =~ /^t_/ ) { $fmt_key =~ s/^t_//; $maf_line{$fmt_col} = ( defined $tum_info{$fmt_key} ? $tum_info{$fmt_key} : "" ); }
-        if ( $fmt_key =~ /^n_/ ) { $fmt_key =~ s/^n_//; $maf_line{$fmt_col} = ( defined $nrm_info{$fmt_key} ? $nrm_info{$fmt_key} : "" ); }  
+        if ( $fmt_key =~ /^n_/ ) { $fmt_key =~ s/^n_//; $maf_line{$fmt_col} = ( defined $nrm_info{$fmt_key} ? $nrm_info{$fmt_key} : "" ); }
     }
 
     # If this is an SV, pair up gene names from separate lines to backfill the Fusion column later
@@ -1023,7 +1023,7 @@ sub FixAlleleDepths {
     elsif( !defined $fmt_info{AD} and defined $fmt_info{TIR} and defined $fmt_info{TAR}) {
         @depths = map{""} @alleles;
         $depths[0] = ( split /,/, $fmt_info{TAR} )[0];
-        $depths[$var_allele_idx] = ( split /,/, $fmt_info{TIR} )[0];	
+        $depths[$var_allele_idx] = ( split /,/, $fmt_info{TIR} )[0];
     }
     # Handle VCF lines by CaVEMan, where allele depths are in FAZ:FCZ:FGZ:FTZ:RAZ:RCZ:RGZ:RTZ
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/FAZ FCZ FGZ FTZ RAZ RCZ RGZ RTZ/ ) == 8 ) {
@@ -1135,7 +1135,7 @@ __DATA__
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 94) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
  --retain-fmt     Comma-delimited names of FORMAT fields to retain as extra columns in MAF []
