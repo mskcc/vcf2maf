@@ -1,0 +1,49 @@
+# Reference: http://docs.travis-ci.com/user/languages/perl/
+
+language: perl
+perl:
+  - "5.22"
+
+branches:
+  only:
+    - develop
+    - master
+
+sudo: false
+
+addons:
+  apt:
+    packages:
+    - curl
+    - rsync
+    - tar
+    - make
+    - perl
+    - perl-base
+    - cpanminus
+    - build-essential
+    - libncurses-dev
+    - libexpat1-dev
+    - libssl-dev
+    - libmysqlclient-dev
+    - libxml2-dev
+    - tabix
+    - samtools
+
+env:
+  - VEP_PATH=$HOME/vep VEP_DATA=$HOME/.vep PERL5LIB=$VEP_PATH:$PERL5LIB PATH=$VEP_PATH/htslib:$PATH
+
+before_install:
+  - cpanm --notest JSON JSON::Parse XML::Parser XML::Simple Text::CSV LWP LWP::Simple LWP::Protocol::https HTML::Lint Archive::Extract Archive::Tar Archive::Zip Capture::Tiny CGI DBI Time::HiRes DBD::mysql Set::IntervalTree PerlIO::gzip IO::Uncompress::Gunzip Bio::DB::BigFile Sereal
+
+install:
+  - mkdir $VEP_PATH $VEP_DATA
+  - curl -LO https://github.com/Ensembl/ensembl-vep/archive/release/95.2.tar.gz
+  - tar -zxf 95.2.tar.gz
+  - mv ensembl-vep-release-95.2 $VEP_PATH
+  - cd $VEP_PATH
+  - perl INSTALL.pl --AUTO acf --SPECIES homo_sapiens --ASSEMBLY GRCh37 --DESTDIR $VEP_PATH --CACHEDIR $VEP_DATA
+  - cd $TRAVIS_BUILD_DIR
+
+script:
+  - perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf --custom-enst data/isoform_overrides_at_mskcc --vep-forks 1
