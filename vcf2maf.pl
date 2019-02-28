@@ -981,11 +981,12 @@ sub FixAlleleDepths {
         }
         @depths = map{( defined $fmt_info{$_.'U'} ? $fmt_info{$_.'U'} : "" )} @alleles;
     }
-    # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR
-    elsif( !defined $fmt_info{AD} and $fmt_info{TIR} ) {
-        # Reference allele depth is not provided by Strelka for indels, so we have to skip it
-        @depths = ( "", ( split /,/, $fmt_info{TIR} )[0] );
-    }
+    # Handle VCF Indel lines by Strelka, where variant allele depth is in TIR and reference allele depth in TAR
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{TIR} and defined $fmt_info{TAR}) {
+	    @depths = map{""} @alleles;
+        $depths[0] = ( split /,/, $fmt_info{TAR} )[0];
+        $depths[$var_allele_idx] = ( split /,/, $fmt_info{TIR} )[0];	
+    
     # Handle VCF lines by CaVEMan, where allele depths are in FAZ:FCZ:FGZ:FTZ:RAZ:RCZ:RGZ:RTZ
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/FAZ FCZ FGZ FTZ RAZ RCZ RGZ RTZ/ ) == 8 ) {
         # Create tags for forward+reverse strand reads, and use those to determine REF/ALT depths
