@@ -3,6 +3,8 @@ vcf<img src="http://i.giphy.com/R6X7GehJWQYms.gif" width="30">maf
 
 To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://wiki.nci.nih.gov/x/eJaPAQ), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. But even within a single isoform, a `Missense_Mutation` close enough to a `Splice_Site`, can be labeled as either in MAF format, but not as both. **This selection of a single effect per variant, is often subjective. And that's what this project attempts to standardize.** The `vcf2maf` and `maf2maf` scripts leave most of that responsibility to [Ensembl's VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html), but allows you to override their "canonical" isoforms, or use a custom ExAC VCF for annotation. Though the most useful feature is the **extensive support in parsing a wide range of crappy MAF-like or VCF-like formats** we've seen out in the wild.
 
+[![Build Status](https://travis-ci.org/mskcc/vcf2maf.svg?branch=master)](https://travis-ci.org/mskcc/vcf2maf)
+
 Quick start
 -----------
 
@@ -13,7 +15,7 @@ Find the [latest stable release](https://github.com/mskcc/vcf2maf/releases), dow
     perl vcf2maf.pl --man
     perl maf2maf.pl --man
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/f265ea7c59a880e28b1e533a6e935697). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/5390e3ae4ecf182fa92f6318cfa9fa97). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
 
     perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf
 

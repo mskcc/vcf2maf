@@ -3,7 +3,7 @@
 dist: xenial
 sudo: false
 language: perl
-perl: "5.22"
+perl: "5.26"
 
 branches:
   only:
@@ -15,27 +15,20 @@ addons:
     packages:
     - samtools
     - tabix
-    - bcftools
-    - zlib1g-dev
-    - libarchive-zip-perl
-    - libdbd-mysql-perl
-    - libdbi-perl
-    - libmodule-build-perl
-    - libtest-simple-perl
 
 env:
-  - VEP_VERSION=95.3
+  - VEP_VERSION=95.3 PERL5LIB=$HOME/vep:$PERL5LIB
 
 before_install:
   - rsync rsync://ftp.ensembl.org/ensembl/pub/release-95/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz data/
   - gzip -d data/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz
-  - bgzip data/Homo_sapiens.GRCh38.dna.chromosome.13.fa
+  - cpanm --notest Archive::Zip DBD::mysql DBI Test::Simple
 
 install:
   - wget -P $HOME https://github.com/Ensembl/ensembl-vep/archive/release/${VEP_VERSION}.tar.gz
   - tar -zxf $HOME/${VEP_VERSION}.tar.gz -C $HOME
   - mv $HOME/ensembl-vep-release-${VEP_VERSION} $HOME/vep
-  - perl $HOME/vep/INSTALL.pl --NO_UPDATE --AUTO a --DESTDIR $HOME/vep
+  - perl $HOME/vep/INSTALL.pl --NO_TEST --NO_HTSLIB --NO_UPDATE --AUTO a --DESTDIR $HOME/vep
 
 script:
   - perl tests/vcf2maf.t
