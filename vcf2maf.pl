@@ -13,8 +13,8 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/91_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0 );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
 
@@ -207,6 +207,7 @@ GetOptions(
     'vep-forks=s' => \$vep_forks,
     'buffer-size=i' => \$buffer_size,
     'any-allele!' => \$any_allele,
+    'online!' => \$online,
     'ref-fasta=s' => \$ref_fasta,
     'species=s' => \$species,
     'ncbi-build=s' => \$ncbi_build,
@@ -252,7 +253,7 @@ my $input_name = substr( $input_vcf, rindex( $input_vcf, "/" ) + 1 );
 $input_name =~ s/(\.vcf)*$//;
 
 # If the VCF contains SVs, split the breakpoints into separate lines before passing to VEP
-my $split_svs = 0;
+my ( $split_svs, $var_count ) = ( 0, 0 );
 my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
 my $split_vcf_fh = IO::File->new( "$tmp_dir/$input_name.split.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.split.vcf!\n";
 while( my $line = $orig_vcf_fh->getline ) {
@@ -265,6 +266,7 @@ while( my $line = $orig_vcf_fh->getline ) {
     }
 
     chomp( $line );
+    ++$var_count;
     my @cols = split( "\t", $line );
     my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $cols[7] );
     if( $info{SVTYPE} ){
@@ -299,6 +301,11 @@ $orig_vcf_fh->close;
 
 # Delete the split.vcf created above if we didn't find any variants with the SVTYPE tag
 unlink( "$tmp_dir/$input_name.split.vcf" ) if( $input_vcf ne "$tmp_dir/$input_name.split.vcf" );
+
+# Make sure the --online option is only used with small GRCh38 VCFs
+if( $online ) {
+    ( $var_count < 100 and $ncbi_build eq "GRCh38" ) or die "ERROR: Option --online can only be used with GRCh38 VCFs listing <100 events\n";
+}
 
 # If a liftOver chain was provided, remap and switch the input VCF before annotation
 my ( %remap );
@@ -364,7 +371,7 @@ my ( $lines, @regions_split ) = ( "", ());
 my @regions = keys %uniq_regions;
 my $chr_prefix_in_use = ( @regions and $regions[0] =~ m/^chr/ ? 1 : 0 );
 push( @regions_split, [ splice( @regions, 0, $buffer_size ) ] ) while @regions;
-map{ my $region = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $region` } @regions_split;
+map{ my $region = join( " ", sort @{$_} ); $lines .= `$samtools faidx $ref_fasta $region` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
     my ( $region, $bps ) = split( "\n", $line, 2 );
@@ -378,7 +385,7 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 # If flanking_bps is entirely empty, then it's most likely that the user chose the wrong ref-fasta
 # Or it's also possible that an outdated samtools was unable to parse the gzipped FASTA files
 # ::NOTE:: If input had no variants, don't break here, so we can continue to create an empty MAF
-( !@regions or %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
+( !@regions_split or %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
 
 # Skip filtering if not handling GRCh37, and filter-vcf is pointing to the default GRCh37 ExAC VCF
 if(( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" and $filter_vcf ) or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" )) {
@@ -427,7 +434,9 @@ unless( -s $output_vcf ) {
     ( -s $vep_script ) or die "ERROR: Cannot find VEP script in path: $vep_path\n";
 
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build --offline --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
+    my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
+    # Change options based on whether we are running in offline mode or not
+    $vep_cmd .= ( $online ? " --database --host useastdb.ensembl.org" : " --offline --pubmed" );
     # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
     # Require allele match for co-located variants unless user-rejected or we're using a newer VEP
@@ -436,11 +445,12 @@ unless( -s $output_vcf ) {
     $vep_cmd .= " --cache_version $cache_version" if( $cache_version );
     # Add options that only work on human variants
     if( $species eq "homo_sapiens" ) {
-        # Slight change in these arguments if using the newer VEP
-        $vep_cmd .= " --polyphen b " . ( $vep_script =~ m/vep$/ ? "--af --af_1kg --af_esp --af_gnomad" : "--gmaf --maf_1kg --maf_esp" );
+        # Slight change in options if in offline mode, or if using the newer VEP
+        $vep_cmd .= " --polyphen b" . ( $vep_script =~ m/vep$/ ? " --af" : " --gmaf" );
+        $vep_cmd .= ( $vep_script =~ m/vep$/ ? " --af_1kg --af_esp --af_gnomad" : " --maf_1kg --maf_esp" ) unless( $online );
     }
-    # Add options that work for most species, except a few we know about
-    $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" );
+    # Do not use the --regulatory option in situations where we know it will break
+    $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" or $online );
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
@@ -1081,7 +1091,8 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/91_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --filter-vcf     A VCF for FILTER tag common_variant. Set to 0 to disable [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
