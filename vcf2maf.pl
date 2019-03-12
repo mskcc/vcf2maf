@@ -15,7 +15,7 @@ use Config;
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", 0.7, 10 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
 
 # Find out if samtools and tabix are properly installed, and warn the user if it's not
@@ -214,6 +214,7 @@ GetOptions(
     'cache-version=s' => \$cache_version,
     'maf-center=s' => \$maf_center,
     'retain-info=s' => \$retain_info,
+    'retain-fmt=s' => \$retain_fmt,
     'min-hom-vaf=s' => \$min_hom_vaf,
     'remap-chain=s' => \$remap_chain,
     'filter-vcf=s' => \$filter_vcf,
@@ -495,6 +496,19 @@ if( $retain_info or $remap_chain or $split_svs ) {
     # If we had to split some SVs earlier, add some columns with some useful info about SVs
     push( @addl_info_cols, qw( Fusion Method Frame CONSENSUS )) if( $split_svs );
     push( @maf_header, @addl_info_cols );
+}
+
+# If the user has FORMAT fields they want to retain, create additional columns for those
+my @addl_fmt_cols = ();
+if( $retain_fmt ) {
+    foreach my $fmt_tag ( split( ",", $retain_fmt )) {
+        # Create 2 columns for tumor/normal, except if a column name is already used
+        my ( $tc, $nc ) = ( "t_$fmt_tag", "n_$fmt_tag" );
+        my %maf_cols = map{ my $c = lc; ( $c, 1 ) } @maf_header;
+        if(!$maf_cols{lc($tc)}) { push (@addl_fmt_cols, $tc); }
+        if(!$maf_cols{lc($nc)}) { push (@addl_fmt_cols, $nc); }
+    }
+    push( @maf_header, @addl_fmt_cols );
 }
 
 # Locate and load the file mapping ENSG IDs to Entrez IDs
@@ -874,6 +888,13 @@ while( my $line = $annotated_vcf_fh->getline ) {
         $maf_line{$info_col} = ( defined $info{$info_col} ? $info{$info_col} : "" );
     }
 
+    # If there are additional FORMAT data to add, then add those
+    foreach my $fmt_col ( @addl_fmt_cols ) {
+        my $fmt_key = $fmt_col;
+        if ( $fmt_key =~ /^t_/ ) { $fmt_key =~ s/^t_//; $maf_line{$fmt_col} = ( defined $tum_info{$fmt_key} ? $tum_info{$fmt_key} : "" ); }
+        if ( $fmt_key =~ /^n_/ ) { $fmt_key =~ s/^n_//; $maf_line{$fmt_col} = ( defined $nrm_info{$fmt_key} ? $nrm_info{$fmt_key} : "" ); }  
+    }
+
     # If this is an SV, pair up gene names from separate lines to backfill the Fusion column later
     if( $split_svs and $var=~m/^<BND|DEL|DUP|INV>$/ ) {
         my $sv_key = "$var_id-$tumor_id";
@@ -1100,6 +1121,7 @@ __DATA__
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
+ --retain-fmt     Comma-delimited names of FORMAT fields to retain as extra columns in MAF []
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --remap-chain    Chain file to remap variants to a different assembly before running VEP
  --help           Print a brief help message and quit
@@ -1123,6 +1145,7 @@ This script needs VEP, a variant annotator that maps effects of a variant on all
 
  Cyriac Kandoth (ckandoth@gmail.com)
  Shweta Chavan (chavan.shweta@gmail.com)
+ Zuojian Tang (zuojian.tang@gmail.com)
 
 =head1 LICENSE
 
