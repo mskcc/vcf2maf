@@ -477,13 +477,16 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     EXON INTRON DOMAINS AF AFR_AF AMR_AF ASN_AF EAS_AF EUR_AF SAS_AF AA_AF EA_AF CLIN_SIG SOMATIC
     PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL
     HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE
-    ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual ExAC_AF_Adj
+    ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps vcf_id vcf_qual ExAC_AF_Adj
     ExAC_AC_AN_Adj ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS ExAC_AC_AN_FIN
     ExAC_AC_AN_NFE ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER gnomAD_AF gnomAD_AFR_AF gnomAD_AMR_AF
     gnomAD_ASJ_AF gnomAD_EAS_AF gnomAD_FIN_AF gnomAD_NFE_AF gnomAD_OTH_AF gnomAD_SAS_AF );
 
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
+
+# Add original VCF POS column header
+push( @maf_header, "vcf_pos" );
 
 # If the user has INFO fields they want to retain, create additional columns for those
 my @addl_info_cols = ();
@@ -880,8 +883,11 @@ while( my $line = $annotated_vcf_fh->getline ) {
     $maf_line{flanking_bps} = $flanking_bps{$region};
 
     # Add ID and QUAL from the input VCF into respective MAF columns
-    $maf_line{variant_id} = $var_id;
-    $maf_line{variant_qual} = $var_qual;
+    $maf_line{vcf_id} = $var_id;
+    $maf_line{vcf_qual} = $var_qual;
+
+    # Add original VCF POS column
+    $maf_line{vcf_pos} = $vcf_pos;
 
     # If there are additional INFO data to add, then add those
     foreach my $info_col ( @addl_info_cols ) {
@@ -930,7 +936,7 @@ if( $split_svs ) {
             # Copy the header unchanged, after figuring out necessary column indexes
             foreach( split( /\t/, $line )) { last if( $_ eq "Tumor_Sample_Barcode" ); ++$tid_idx; }
             foreach( split( /\t/, $line )) { last if( $_ eq "Fusion" ); ++$fusion_idx; }
-            foreach( split( /\t/, $line )) { last if( $_ eq "variant_id" ); ++$var_id_idx; }
+            foreach( split( /\t/, $line )) { last if( $_ eq "vcf_id" ); ++$var_id_idx; }
             $out_maf_fh->print( "$line\n" ); # Copy header unchanged
         }
         else {
