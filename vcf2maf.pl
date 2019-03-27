@@ -563,7 +563,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     }
 
     # Parse out the data in the info column, and store into a hash
-    my %info = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
+    my %info = map {( $_, "1" )} grep { !m/=/ } split( /\;/, $info_line );
+    map { my ( $key, $val ) = split( /=/, $_, 2 ); $info{$key} .= ( $info{$key} ? ",$val" : $val ) unless( $info{$key} and grep { /^$val$/ } split( ",", $info{$key} ))} grep { m/=/ } split( /\;/, $info_line );
 
     # By default, the variant allele is the first (usually the only) allele listed under ALT. If
     # there are >1 alleles in ALT, choose the first non-REF allele listed under tumor GT, that is
