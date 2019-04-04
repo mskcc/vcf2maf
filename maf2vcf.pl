@@ -99,10 +99,10 @@ while( my $line = $maf_fh->getline ) {
 $maf_fh->close;
 
 # samtools runs faster when passed many loci at a time, but limited to around 125k args at least on
-# CentOS6. If there are too many loci, let's split them into 50k chunks and run separately
+# CentOS6. If there are too many loci, let's split them into smaller chunks and run separately
 my ( @regions_split, $lines );
 my @regions = keys %uniq_regions;
-push( @regions_split, [ splice( @regions, 0, 50000 ) ] ) while @regions;
+push( @regions_split, [ splice( @regions, 0, 5000 ) ] ) while @regions;
 map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
