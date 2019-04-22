@@ -33,7 +33,7 @@ install:
   - tar -zxf $HOME/${VEP_VERSION}.tar.gz -C $HOME
   - mv $HOME/ensembl-vep-release-${VEP_VERSION} $HOME/vep
   # Add a delay between downloads from api.github.com, to prevent rate limiting
-  - perl -i -pe '$_.="  sleep 6;\n" if(/^sub download_to_file/);' $HOME/vep/INSTALL.pl
+  - perl -i -pe '$_.="  sleep 12;\n" if(/^sub download_to_file/);' $HOME/vep/INSTALL.pl
   - perl $HOME/vep/INSTALL.pl --NO_TEST --NO_HTSLIB --NO_UPDATE --PREFER_BIN --AUTO a --DESTDIR $HOME/vep
   - rsync rsync://ftp.ensembl.org/ensembl/pub/release-95/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz data/
   - gzip -d data/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz

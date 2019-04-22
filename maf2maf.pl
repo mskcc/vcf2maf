@@ -228,8 +228,8 @@ foreach my $tn_vcf ( @vcfs ) {
     $tn_maf =~ s/.vcf$/.vep.maf/;
     my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf" .
         " --tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data" .
-        " --vep-forks $vep_forks --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species";
-    $vcf2maf_cmd .= " --filter-vcf $filter_vcf --max-filter-ac $max_filter_ac" if( $filter_vcf );
+        " --vep-forks $vep_forks --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species" .
+        " --filter-vcf $filter_vcf --max-filter-ac $max_filter_ac";
     $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf! Command: $vcf2maf_cmd\n";
 }
