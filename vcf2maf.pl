@@ -1042,6 +1042,15 @@ sub FixAlleleDepths {
         $depths[0] = $fmt_info{RR};
         $depths[$var_allele_idx] = $fmt_info{RV};
     }
+    # Handle VCF lines where REF/ALT allele counts must be extracted from DP4
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{DP4} and scalar( split( /,/, $fmt_info{DP4} )) == 4 ) {
+        # Reference allele depth and depths for any other ALT alleles must be left undefined
+        @depths = map{""} @alleles;
+        # DP4 is usually a comma-delimited list for ref-forward, ref-reverse, alt-forward and alt-reverse read counts
+        my @count = split( /,/, $fmt_info{DP4} );
+        $depths[0] = $count[0] + $count[1];
+        $depths[$var_allele_idx] = $count[2] + $count[3];
+    }
     # Handle VCF lines from cgpPindel, where ALT depth and total depth are in PP:NP:PR:NR
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/PP NP PR NR/ ) == 4 ) {
         # Reference allele depth and depths for any other ALT alleles must be left undefined
