@@ -31,6 +31,8 @@ If you have the VEP script in a different folder like `/opt/vep`, and its cache 
 
     perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf --vep-path /opt/vep --vep-data /srv/vep
 
+You can also omit the running of VEP by including the option --inhibit-vep
+
 maf2maf
 -------
 
