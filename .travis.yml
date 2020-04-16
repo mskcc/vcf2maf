@@ -1,16 +1,13 @@
-# Reference: http://docs.travis-ci.com/user/languages/perl/
-
-dist: bionic
-sudo: false
 language: perl
-perl: "5.26"
+os: linux
+dist: bionic
 services: docker
 
 branches:
   only:
     - master
 
-before_install:
+install:
   - docker build -t vcf2maf:master .
   - docker image prune -f
   - rsync rsync://ftp.ensembl.org/ensembl/pub/current_fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz tests/
