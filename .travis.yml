@@ -1,42 +1,20 @@
 # Reference: http://docs.travis-ci.com/user/languages/perl/
 
-dist: xenial
+dist: bionic
 sudo: false
 language: perl
 perl: "5.26"
+services: docker
 
 branches:
   only:
     - master
 
-addons:
-  apt:
-    packages:
-    - libmysqlclient-dev
-    - build-essential
-    - cpanminus
-    - samtools
-    - tabix
-    - unzip
-    - rsync
-    - wget
-    - gzip
-
-env:
-  - VEP_VERSION=95.3
-
 before_install:
-  - cpanm --notest LWP::Simple DBI DBD::mysql Archive::Zip Archive::Extract HTTP::Tiny Test::Simple
-
-install:
-  - wget -qP $HOME https://github.com/Ensembl/ensembl-vep/archive/release/${VEP_VERSION}.tar.gz
-  - tar -zxf $HOME/${VEP_VERSION}.tar.gz -C $HOME
-  - mv $HOME/ensembl-vep-release-${VEP_VERSION} $HOME/vep
-  # Add a delay between downloads from api.github.com, to prevent rate limiting
-  - perl -i -pe '$_.="  sleep 12;\n" if(/^sub download_to_file/);' $HOME/vep/INSTALL.pl
-  - perl $HOME/vep/INSTALL.pl --NO_TEST --NO_HTSLIB --NO_UPDATE --PREFER_BIN --AUTO a --DESTDIR $HOME/vep
-  - rsync rsync://ftp.ensembl.org/ensembl/pub/release-95/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz data/
-  - gzip -d data/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz
+  - docker build -t vcf2maf:master .
+  - docker image prune -f
+  - rsync rsync://ftp.ensembl.org/ensembl/pub/current_fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz tests/
+  - gzip -d tests/Homo_sapiens.GRCh38.dna.chromosome.13.fa.gz
 
 script:
   - perl tests/vcf2maf.t

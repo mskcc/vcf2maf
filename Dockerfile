@@ -1,26 +1,29 @@
-FROM ubuntu:bionic
+FROM clearlinux:latest AS builder
 
-RUN apt update && apt install -y build-essential git cpanminus curl wget unzip automake samtools tabix
-RUN apt install -y libmysqlclient-dev libncurses5-dev zlib1g-dev libgsl0-dev libexpat1-dev libgd-dev
+ENV CLEAR_VERSION=32820 \
+    MINICONDA_VERSION=py38_4.8.2 \
+    VEP_VERSION=99.2
 
-RUN cpanm --notest LWP::Simple DBI DBD::mysql Archive::Zip Archive::Extract HTTP::Tiny Test::Simple
-RUN cpanm --notest File::Copy::Recursive Perl::OSType Module::Metadata version TAP::Harness CGI Encode
-RUN cpanm --notest CPAN::Meta JSON DBD::SQLite Set::IntervalTree Archive::Tar Time::HiRes Module::Build
-RUN cpanm --notest Bio::Root::Version
+# Prepare a root directory with minimal OS and some dependencies
+RUN swupd os-install --no-progress --no-boot-update --no-scripts \
+    --version ${CLEAR_VERSION} \
+    --path /install_root \
+    --statedir /swupd-state \
+    --bundles os-core-update,which,samtools
 
+# Use conda to install VEP and remaining dependencies into /usr/local
+RUN swupd bundle-add --no-progress curl && \
+    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh -o /tmp/miniconda.sh && \
+    sh /tmp/miniconda.sh -bfp /usr && \
+    conda create -qy -p /usr/local -c conda-forge -c bioconda -c defaults ensembl-vep==${VEP_VERSION}
+
+# Deploy the minimal OS and tools into a clean target layer
+FROM scratch
+
+LABEL maintainer="Cyriac Kandoth <ckandoth@gmail.com>"
+
+COPY --from=builder /install_root /
+COPY --from=builder /usr/local /usr/local
+COPY data /opt/data
+COPY *.pl /opt/
 WORKDIR /opt
-RUN mkdir -p variant_effect_predictor_95/cache
-RUN wget -q https://github.com/Ensembl/ensembl-vep/archive/release/95.3.tar.gz
-RUN tar -zxf 95.3.tar.gz -C variant_effect_predictor_95 && rm 95.3.tar.gz
-
-WORKDIR /opt/variant_effect_predictor_95
-RUN perl ensembl-vep-release-95.3/INSTALL.pl --NO_TEST --NO_UPDATE --AUTO ap --PLUGINS LoF --DESTDIR ensembl-vep-release-95.3 --CACHEDIR cache
-
-WORKDIR /opt/variant_effect_predictor_95/cache/Plugins
-RUN wget -q https://raw.githubusercontent.com/konradjk/loftee/v0.3-beta/splice_module.pl
-
-WORKDIR /opt
-ADD . /opt/vcf2maf 
-COPY Dockerfile /opt/
-
-MAINTAINER Michele Mattioni, Seven Bridges, <michele.mattioni@sbgenomics.com>
