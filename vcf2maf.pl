@@ -899,7 +899,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     foreach my $fmt_col ( @addl_fmt_cols ) {
         my $fmt_key = $fmt_col;
         if ( $fmt_key =~ /^t_/ ) { $fmt_key =~ s/^t_//; $maf_line{$fmt_col} = ( defined $tum_info{$fmt_key} ? $tum_info{$fmt_key} : "" ); }
-        if ( $fmt_key =~ /^n_/ ) { $fmt_key =~ s/^n_//; $maf_line{$fmt_col} = ( defined $nrm_info{$fmt_key} ? $nrm_info{$fmt_key} : "" ); }  
+        if ( $fmt_key =~ /^n_/ ) { $fmt_key =~ s/^n_//; $maf_line{$fmt_col} = ( defined $nrm_info{$fmt_key} ? $nrm_info{$fmt_key} : "" ); }
     }
 
     # If this is an SV, pair up gene names from separate lines to backfill the Fusion column later
@@ -1023,7 +1023,7 @@ sub FixAlleleDepths {
     elsif( !defined $fmt_info{AD} and defined $fmt_info{TIR} and defined $fmt_info{TAR}) {
         @depths = map{""} @alleles;
         $depths[0] = ( split /,/, $fmt_info{TAR} )[0];
-        $depths[$var_allele_idx] = ( split /,/, $fmt_info{TIR} )[0];	
+        $depths[$var_allele_idx] = ( split /,/, $fmt_info{TIR} )[0];
     }
     # Handle VCF lines by CaVEMan, where allele depths are in FAZ:FCZ:FGZ:FTZ:RAZ:RCZ:RGZ:RTZ
     elsif( !defined $fmt_info{AD} and scalar( grep{defined $fmt_info{$_}} qw/FAZ FCZ FGZ FTZ RAZ RCZ RGZ RTZ/ ) == 8 ) {
