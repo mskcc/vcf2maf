@@ -13,8 +13,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my $inhibit_vep = 0;
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0 );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
@@ -203,12 +202,12 @@ GetOptions(
     'vcf-tumor-id=s' => \$vcf_tumor_id,
     'vcf-normal-id=s' => \$vcf_normal_id,
     'custom-enst=s' => \$custom_enst_file,
-    'inhibit-vep!' => \$inhibit_vep,
     'vep-path=s' => \$vep_path,
     'vep-data=s' => \$vep_data,
     'vep-forks=s' => \$vep_forks,
     'buffer-size=i' => \$buffer_size,
     'any-allele!' => \$any_allele,
+    'inhibit-vep!' => \$inhibit_vep,
     'online!' => \$online,
     'ref-fasta=s' => \$ref_fasta,
     'species=s' => \$species,
@@ -427,12 +426,10 @@ foreach my $region ( @ref_regions ) {
     }
 }
 
-# Annotate variants in given VCF to all possible transcripts
-my $output_vcf = ( $remap_chain ? "$tmp_dir/$input_name.remap.vep.vcf" : "$tmp_dir/$input_name.vep.vcf" );
-
-# Skip running VEP if an annotated VCF already exists
-unless( not $inhibit_vep && -s $output_vcf ) {
-
+# Annotate variants in given VCF to all possible transcripts, unless user requested to skip VEP
+my $output_vcf = $input_vcf;
+unless( $inhibit_vep ) {
+    $output_vcf = ( $remap_chain ? "$tmp_dir/$input_name.remap.vep.vcf" : "$tmp_dir/$input_name.vep.vcf" );
     warn "STATUS: Running VEP and writing to: $output_vcf\n";
     # Make sure we can find the VEP script
     my $vep_script = ( -s "$vep_path/vep" ? "$vep_path/vep" : "$vep_path/variant_effect_predictor.pl" );
@@ -532,8 +529,8 @@ if( -s $entrez_id_file ) {
 # one transcript per variant whose annotation will be used in the MAF
 my $maf_fh = IO::File->new( $output_maf, ">" ) or die "ERROR: Couldn't open --output-maf: $output_maf!\n";
 $maf_fh->print( "#version 2.4\n" . join( "\t", @maf_header ), "\n" ); # Print MAF header
-( -s $input_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
-my $annotated_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open un-annotated VCF: $input_vcf!\n";
+( -s $output_vcf ) or exit; # Warnings on this were printed earlier, but quit here, only after a blank MAF is created
+my $annotated_vcf_fh = IO::File->new( $output_vcf ) or die "ERROR: Couldn't open annotated VCF: $output_vcf!\n";
 my ( $vcf_tumor_idx, $vcf_normal_idx, %sv_pair );
 while( my $line = $annotated_vcf_fh->getline ) {
 
@@ -780,11 +777,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
     $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
     $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Transcript_ID} );
-    if( $inhibit_vep || ! defined $entrez_id_map{$maf_effect->{Gene}} ) {
-        $maf_line{Entrez_Gene_Id} = "0"; }
-    else {
-        $maf_line{Entrez_Gene_Id} = $entrez_id_map{$maf_effect->{Gene}};
-    }
+    $maf_line{Entrez_Gene_Id} = ( defined $maf_effect->{Gene} && defined $entrez_id_map{$maf_effect->{Gene}} ? $entrez_id_map{$maf_effect->{Gene}} : "0" );
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
     $maf_line{Chromosome} = $chrom;
@@ -964,12 +957,8 @@ if( $split_svs ) {
 
 # Converts Sequence Ontology variant types to MAF variant classifications
 sub GetVariantClassification {
-    my $DEFAULT_CLASSIFICATION = "Targeted_Region";
-    # When not using VEP, the effect is not known
-    if( $inhibit_vep ) {
-        return $DEFAULT_CLASSIFICATION;
-    }
     my ( $effect, $var_type, $inframe ) = @_;
+    return "Targeted_Region" if( not defined $effect or not $effect ); # In case VEP was skipped
     return "Splice_Site" if( $effect =~ /^(splice_acceptor_variant|splice_donor_variant|transcript_ablation|exon_loss_variant)$/ );
     return "Nonsense_Mutation" if( $effect eq 'stop_gained' );
     return "Frame_Shift_Del" if(( $effect eq 'frameshift_variant' or ( $effect eq 'protein_altering_variant' and !$inframe )) and $var_type eq 'DEL' );
@@ -992,7 +981,7 @@ sub GetVariantClassification {
     # Annotate everything else simply as a targeted region
     # TFBS_ablation, TFBS_amplification,regulatory_region_ablation, regulatory_region_amplification,
     # feature_elongation, feature_truncation
-    return $DEFAULT_CLASSIFICATION;
+    return "Targeted_Region";
 }
 
 # Fix the AD and DP fields, given data from a FORMATted genotype string
@@ -1056,7 +1045,7 @@ sub FixAlleleDepths {
         $depths[$var_allele_idx] = $fmt_info{RV};
     }
     # Handle VCF lines where REF/ALT allele counts must be extracted from DP4
-    elsif( !defined $fmt_info{AD} and defined $fmt_info{DP4} and scalar( my @fmt_terms = split( /,/, $fmt_info{DP4} )) == 4 ) {
+    elsif( !defined $fmt_info{AD} and defined $fmt_info{DP4} and scalar( split( /,/, $fmt_info{DP4} )) == 4 ) {
         # Reference allele depth and depths for any other ALT alleles must be left undefined
         @depths = map{""} @alleles;
         # DP4 is usually a comma-delimited list for ref-forward, ref-reverse, alt-forward and alt-reverse read counts
@@ -1137,12 +1126,12 @@ __DATA__
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
  --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
  --custom-enst    List of custom ENST IDs that override canonical selection
- --inhibit-vep    Omit the running of VEP to determine variant effects
  --vep-path       Folder containing the vep script [~/vep]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
+ --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
  --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --filter-vcf     A VCF for FILTER tag common_variant. Set to 0 to disable [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
