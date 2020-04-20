@@ -739,7 +739,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             }
 
             # Transcript_Length isn't separately reported, but can be parsed out from cDNA_position
-            ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/;
+            ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/ if( $effect{cDNA_position} );
             $effect{Transcript_Length} = 0 unless( defined $effect{Transcript_Length} );
 
             # Skip effects on other ALT alleles. If ALLELE_NUM is undefined (e.g. for INFO:SVTYPE), don't skip any
