@@ -1,4 +1,3 @@
-# Temporary reference FASTA downloaded for tests and its indexes
-data/Homo_sapiens.GRCh*
-# Intermediate VEP-annotated VCF before conversion to MAF
+# Files downloaded or generated during tests
+tests/Homo_sapiens.GRCh*
 tests/test_b38.vep.vcf

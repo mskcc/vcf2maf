@@ -31,6 +31,8 @@ If you have the VEP script in a different folder like `/opt/vep`, and its cache 
 
     perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf --vep-path /opt/vep --vep-data /srv/vep
 
+If you want to skip running VEP and need a minimalist MAF format listing data from the input VCF only, then use the `--inhibit-vep` option. If your input VCF contains VEP annotation, then `vcf2maf` will try to extract it. But be warned that the accuracy of your resulting MAF depends on how VEP was operated upstream. `vcf2maf` operates VEP with very specific parameters to make sure everyone has comparable MAFs.
+
 maf2maf
 -------
 

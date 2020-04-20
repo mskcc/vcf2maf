@@ -13,7 +13,7 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0 );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
@@ -207,6 +207,7 @@ GetOptions(
     'vep-forks=s' => \$vep_forks,
     'buffer-size=i' => \$buffer_size,
     'any-allele!' => \$any_allele,
+    'inhibit-vep!' => \$inhibit_vep,
     'online!' => \$online,
     'ref-fasta=s' => \$ref_fasta,
     'species=s' => \$species,
@@ -425,10 +426,10 @@ foreach my $region ( @ref_regions ) {
     }
 }
 
-# Annotate variants in given VCF to all possible transcripts
-my $output_vcf = ( $remap_chain ? "$tmp_dir/$input_name.remap.vep.vcf" : "$tmp_dir/$input_name.vep.vcf" );
-# Skip running VEP if an annotated VCF already exists
-unless( -s $output_vcf ) {
+# Annotate variants in given VCF to all possible transcripts, unless user requested to skip VEP
+my $output_vcf = $input_vcf;
+unless( $inhibit_vep ) {
+    $output_vcf = ( $remap_chain ? "$tmp_dir/$input_name.remap.vep.vcf" : "$tmp_dir/$input_name.vep.vcf" );
     warn "STATUS: Running VEP and writing to: $output_vcf\n";
     # Make sure we can find the VEP script
     my $vep_script = ( -s "$vep_path/vep" ? "$vep_path/vep" : "$vep_path/variant_effect_predictor.pl" );
@@ -738,7 +739,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
             }
 
             # Transcript_Length isn't separately reported, but can be parsed out from cDNA_position
-            ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/;
+            ( $effect{Transcript_Length} ) = $effect{cDNA_position} =~ m/\/(\d+)$/ if( $effect{cDNA_position} );
             $effect{Transcript_Length} = 0 unless( defined $effect{Transcript_Length} );
 
             # Skip effects on other ALT alleles. If ALLELE_NUM is undefined (e.g. for INFO:SVTYPE), don't skip any
@@ -776,7 +777,7 @@ while( my $line = $annotated_vcf_fh->getline ) {
     %maf_line = map{( $_, ( $maf_effect->{$_} ? $maf_effect->{$_} : '' ))} @maf_header;
     $maf_line{Hugo_Symbol} = $maf_effect->{Transcript_ID} unless( $maf_effect->{Hugo_Symbol} );
     $maf_line{Hugo_Symbol} = 'Unknown' unless( $maf_effect->{Transcript_ID} );
-    $maf_line{Entrez_Gene_Id} = ( defined $entrez_id_map{$maf_effect->{Gene}} ? $entrez_id_map{$maf_effect->{Gene}} : "0" );
+    $maf_line{Entrez_Gene_Id} = ( defined $maf_effect->{Gene} && defined $entrez_id_map{$maf_effect->{Gene}} ? $entrez_id_map{$maf_effect->{Gene}} : "0" );
     $maf_line{Center} = $maf_center;
     $maf_line{NCBI_Build} = $ncbi_build;
     $maf_line{Chromosome} = $chrom;
@@ -957,6 +958,7 @@ if( $split_svs ) {
 # Converts Sequence Ontology variant types to MAF variant classifications
 sub GetVariantClassification {
     my ( $effect, $var_type, $inframe ) = @_;
+    return "Targeted_Region" if( not defined $effect or not $effect ); # In case VEP was skipped
     return "Splice_Site" if( $effect =~ /^(splice_acceptor_variant|splice_donor_variant|transcript_ablation|exon_loss_variant)$/ );
     return "Nonsense_Mutation" if( $effect eq 'stop_gained' );
     return "Frame_Shift_Del" if(( $effect eq 'frameshift_variant' or ( $effect eq 'protein_altering_variant' and !$inframe )) and $var_type eq 'DEL' );
@@ -1129,6 +1131,7 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
+ --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
  --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
  --filter-vcf     A VCF for FILTER tag common_variant. Set to 0 to disable [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
@@ -1148,7 +1151,7 @@ __DATA__
 
 To convert a VCF into a MAF, each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable.
 
-This script needs VEP, a variant annotator that maps effects of a variant on all possible genes and transcripts. For more info, see the README.
+This script uses VEP, a variant annotator that maps effects of a variant on all possible genes and transcripts. For more info, see the README.
 
 =head2 Relevant links:
 
