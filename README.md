@@ -15,7 +15,7 @@ Find the [latest stable release](https://github.com/mskcc/vcf2maf/releases), dow
     perl vcf2maf.pl --man
     perl maf2maf.pl --man
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/5390e3ae4ecf182fa92f6318cfa9fa97). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
+If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/61c65ba96b011f286220fa4832ad2bc0). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, you can test the script like so:
 
     perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf
 
