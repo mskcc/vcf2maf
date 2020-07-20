@@ -29,7 +29,7 @@ my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His
     Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Xxx X Ter * );
 
 # Prioritize Sequence Ontology terms in order of severity, as estimated by Ensembl:
-# http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
+# https://ensembl.org/info/genome/variation/prediction/predicted_data.html
 sub GetEffectPriority {
     my ( $effect ) = @_;
     $effect = '' unless( defined $effect );
@@ -93,7 +93,7 @@ sub GetEffectPriority {
 }
 
 # Prioritize the transcript biotypes that variants are annotated to, based on disease significance:
-# All possible biotypes are defined here: http://www.gencodegenes.org/gencode_biotypes.html
+# All possible biotypes are defined here: https://www.gencodegenes.org/pages/biotypes.html
 sub GetBiotypePriority {
     my ( $biotype ) = @_;
     $biotype = '' unless( defined $biotype );
@@ -117,8 +117,9 @@ sub GetBiotypePriority {
         'sRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'scaRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'rRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
+        'scRNA' => 3, # Non-coding RNA predicted using sequences from Rfam and miRBase
         'lincRNA' => 3, # Long, intervening noncoding (linc) RNAs, that can be found in evolutionarily conserved, intergenic regions
-        'lncRNA' => 3, # Long, noncoding (lnc) RNAs  
+        'lncRNA' => 3, # Replaces 3prime_overlapping_ncRNA, antisense, bidirectional_promoter_lncRNA, lincRNA, macro_lncRNA, non_coding, processed_transcript, sense_intronic and sense_overlapping
         'bidirectional_promoter_lncrna' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
         'bidirectional_promoter_lncRNA' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
         'known_ncrna' => 4,
