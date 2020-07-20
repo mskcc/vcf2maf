@@ -118,6 +118,7 @@ sub GetBiotypePriority {
         'scaRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'rRNA' => 3, # Non-coding RNA predicted using sequences from RFAM and miRBase
         'lincRNA' => 3, # Long, intervening noncoding (linc) RNAs, that can be found in evolutionarily conserved, intergenic regions
+        'lncRNA' => 3, # Long, noncoding (lnc) RNAs  
         'bidirectional_promoter_lncrna' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
         'bidirectional_promoter_lncRNA' => 3, # A non-coding locus that originates from within the promoter region of a protein-coding gene, with transcription proceeding in the opposite direction on the other strand
         'known_ncrna' => 4,
