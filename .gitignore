@@ -1,3 +1,4 @@
 # Files downloaded or generated during tests
 tests/Homo_sapiens.GRCh*
+tests/homo_sapiens*
 tests/test_b38.vep.vcf

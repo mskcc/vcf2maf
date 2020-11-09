@@ -3,4 +3,7 @@
 ##FORMAT=<ID=AD,Number=G,Type=Integer,Description="Allelic Depths of REF and ALT(s) in the order listed">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	TUMOR	NORMAL
-13	28034105	.	A	T	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:11,0:11
+21	43094659	.	T	TCTCATA	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:11,0:11
+21	43094660	.	C	CTCATAC	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:11,0:11
+21	43094667	.	T	C	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:11,0:11
+21	43104346	.	G	T	.	.	.	GT:AD:DP	0/1:10,10:20	0/0:11,0:11
