@@ -45,6 +45,8 @@ sub GetEffectPriority {
         'initiator_codon_variant' => 4, # A codon variant that changes at least one base of the first codon of a transcript
         'disruptive_inframe_insertion' => 5, # An inframe increase in cds length that inserts one or more codons into the coding sequence within an existing codon
         'disruptive_inframe_deletion' => 5, # An inframe decrease in cds length that deletes bases from the coding sequence starting within an existing codon
+        'conservative_inframe_insertion' => 5, # An inframe increase in cds length that inserts one or more codons into the coding sequence between existing codons
+        'conservative_inframe_deletion' => 5, # An inframe decrease in cds length that deletes one or more entire codons from the coding sequence but does not change any remaining codons
         'inframe_insertion' => 5, # An inframe non synonymous variant that inserts bases into the coding sequence
         'inframe_deletion' => 5, # An inframe non synonymous variant that deletes bases from the coding sequence
         'protein_altering_variant' => 5, # A sequence variant which is predicted to change the protein encoded in the coding sequence
@@ -537,9 +539,9 @@ my ( $vcf_tumor_idx, $vcf_normal_idx, %sv_pair );
 while( my $line = $annotated_vcf_fh->getline ) {
 
     # Parse out the VEP CSQ/ANN format, which seems to differ between runs
-    if( $line =~ m/^##INFO=<ID=(CSQ|ANN).*Format: (\S+)">$/ ) {
+    if( $line =~ m/^##INFO=<ID=(CSQ|ANN).*: '?([^"']+)["']/ ) {
         # Use this as the expected column order of VEP annotation, unless we already got it from CSQ
-        @ann_cols_format = split( /\|/, $2 ) unless( @ann_cols_format and $1 eq "ANN" );
+        @ann_cols_format = map{s/\s//g; $_} split( /\|/, $2 ) unless( @ann_cols_format and $1 eq "ANN" );
     }
     # Skip all other header lines
     next if( $line =~ m/^##/ );
@@ -686,6 +688,21 @@ while( my $line = $annotated_vcf_fh->getline ) {
             # Remove the prefixed HGVSc code in HGVSp, if found
             $effect{HGVSp} =~ s/^.*\((p\.\S+)\)/$1/ if( $effect{HGVSp} and $effect{HGVSp} =~ m/^c\./ );
 
+            # If we find any snpEff fields, rename them to the corresponding VEP field names
+            $effect{Consequence} = $effect{Annotation} if( $effect{Annotation} );
+            $effect{IMPACT} = $effect{Annotation_Impact} if( $effect{Annotation_Impact} );
+            $effect{SYMBOL} = $effect{Gene_Name} if( $effect{Gene_Name} );
+            $effect{Gene} = $effect{Gene_ID} if( $effect{Gene_ID} );
+            $effect{Feature_type} = $effect{Feature_Type} if( $effect{Feature_Type} );
+            $effect{Feature} = $effect{Feature_ID} if( $effect{Feature_ID} );
+            $effect{BIOTYPE} = $effect{Transcript_BioType} if( $effect{Transcript_BioType} );
+            $effect{HGVSc} = $effect{'HGVS.c'} if( $effect{'HGVS.c'} );
+            $effect{HGVSp} = $effect{'HGVS.p'} if( $effect{'HGVS.p'} );
+            $effect{cDNA_position} = $effect{'cDNA.pos/cDNA.length'} if( $effect{'cDNA.pos/cDNA.length'} );
+            $effect{CDS_position} = $effect{'CDS.pos/CDS.length'} if( $effect{'CDS.pos/CDS.length'} );
+            $effect{Protein_position} = $effect{'AA.pos/AA.length'} if( $effect{'AA.pos/AA.length'} );
+            $effect{DISTANCE} = $effect{Distance} if( $effect{Distance} );
+
             # Sort consequences by decreasing order of severity, and pick the most severe one
             $effect{Consequence} = join( ",", sort { GetEffectPriority($a) <=> GetEffectPriority($b) } split( ",", $effect{Consequence} ));
             ( $effect{One_Consequence} ) = split( ",", $effect{Consequence} );
@@ -709,8 +726,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
                     $c_pos = 1 if( $c_pos < 1 ); # Handle negative cDNA positions used in 5' UTRs
                     my $p_pos = sprintf( "%.0f", ( $c_pos + $c_pos % 3 ) / 3 );
                     $effect{HGVSp_Short} = "p.X" . $p_pos . "_splice";
-                    $effect{CDS_position} =~ s/^-(\/\d+)$/$c_pos$1/;
-                    $effect{Protein_position} =~ s/^-(\/\d+)$/$p_pos$1/;
+                    $effect{CDS_position} =~ s/^-(\/\d+)$/$c_pos$1/ if( $effect{CDS_position} );
+                    $effect{Protein_position} =~ s/^-(\/\d+)$/$p_pos$1/ if( $effect{Protein_position} )
                 }
             }
 
@@ -967,8 +984,8 @@ sub GetVariantClassification {
     return "Frame_Shift_Ins" if(( $effect eq 'frameshift_variant' or ( $effect eq 'protein_altering_variant' and !$inframe )) and $var_type eq 'INS' );
     return "Nonstop_Mutation" if( $effect eq 'stop_lost' );
     return "Translation_Start_Site" if( $effect =~ /^(initiator_codon_variant|start_lost)$/ );
-    return "In_Frame_Ins" if( $effect =~ /^(inframe_insertion|disruptive_inframe_insertion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'INS' ));
-    return "In_Frame_Del" if( $effect =~ /^(inframe_deletion|disruptive_inframe_deletion)$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'DEL' ));
+    return "In_Frame_Ins" if( $effect =~ /inframe_insertion$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'INS' ));
+    return "In_Frame_Del" if( $effect =~ /inframe_deletion$/ or ( $effect eq 'protein_altering_variant' and $inframe and $var_type eq 'DEL' ));
     return "Missense_Mutation" if( $effect =~ /^(missense_variant|coding_sequence_variant|conservative_missense_variant|rare_amino_acid_variant)$/ );
     return "Intron" if ( $effect =~ /^(transcript_amplification|intron_variant|INTRAGENIC|intragenic_variant)$/ );
     return "Splice_Region" if( $effect eq 'splice_region_variant' );
