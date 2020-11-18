@@ -13,8 +13,8 @@ use Config;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0 );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
 
@@ -392,8 +392,7 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 # ::NOTE:: If input had no variants, don't break here, so we can continue to create an empty MAF
 ( !@regions_split or %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
 
-# Skip filtering if not handling GRCh37, and filter-vcf is pointing to the default GRCh37 ExAC VCF
-if(( $species eq "homo_sapiens" and $ncbi_build eq "GRCh37" and $filter_vcf ) or ( $filter_vcf and $filter_vcf ne "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" )) {
+if( $filter_vcf ) {
     ( -s $filter_vcf ) or die "ERROR: Provided --filter-vcf is missing or empty: $filter_vcf\n";
     # Query each variant locus on the filter VCF, using tabix, just like we used samtools earlier
     ( $lines, @regions_split ) = ( "", ());
@@ -436,7 +435,7 @@ unless( $inhibit_vep ) {
     warn "STATUS: Running VEP and writing to: $output_vcf\n";
     # Make sure we can find the VEP script
     my $vep_script = ( -s "$vep_path/vep" ? "$vep_path/vep" : "$vep_path/variant_effect_predictor.pl" );
-    ( -s $vep_script ) or die "ERROR: Cannot find VEP script in path: $vep_path\n";
+    ( -s $vep_script ) or die "ERROR: Cannot find VEP script under: $vep_path\n";
 
     # Contruct VEP command using some default options and run it
     my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
@@ -1136,12 +1135,12 @@ __DATA__
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
  --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
  --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/95_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
- --filter-vcf     A VCF for FILTER tag common_variant. Set to 0 to disable [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+ --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 91, 101) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
  --retain-fmt     Comma-delimited names of FORMAT fields to retain as extra columns in MAF []
