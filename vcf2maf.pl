@@ -1145,7 +1145,7 @@ __DATA__
  --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
  --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
  --custom-enst    List of custom ENST IDs that override canonical selection
- --vep-path       Folder containing the vep script [~/vep]
+ --vep-path       Folder containing the vep script [~/miniconda3/bin]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
@@ -1176,7 +1176,7 @@ This script uses VEP, a variant annotator that maps effects of a variant on all 
 
  Homepage: https://github.com/ckandoth/vcf2maf
  VCF format: http://samtools.github.io/hts-specs/
- MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
+ MAF format: https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format
  VEP: http://ensembl.org/info/docs/tools/vep/index.html
  VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
 

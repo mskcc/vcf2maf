@@ -15,8 +15,8 @@ use Config;
 # Set any default paths and constants
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/vep", "$ENV{HOME}/.vep", 4, 5000, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/91_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz", "$ENV{HOME}/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz" );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0 );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 10 );
 my $perl_bin = $Config{perlpath};
 
@@ -227,9 +227,9 @@ foreach my $tn_vcf ( @vcfs ) {
     $tn_maf =~ s/.vep.vcf$/.vep.maf/;
     my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf --inhibit-vep" .
         " --tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data" .
-        " --vep-forks $vep_forks --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species" .
-        " --filter-vcf $filter_vcf --max-filter-ac $max_filter_ac";
+        " --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species --max-filter-ac $max_filter_ac";
     $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
+    $vcf2maf_cmd .= " --filter-vcf $filter_vcf" if( $filter_vcf );
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf! Command: $vcf2maf_cmd\n";
 }
 
@@ -375,17 +375,17 @@ __DATA__
  --nrm-vad-col    Name of MAF column for variant allele depth in normal BAM [n_alt_count]
  --retain-cols    Comma-delimited list of columns to retain from the input MAF [Center,Verification_Status,Validation_Status,Mutation_Status,Sequencing_Phase,Sequence_Source,Validation_Method,Score,BAM_file,Sequencer,Tumor_Sample_UUID,Matched_Norm_Sample_UUID]
  --custom-enst    List of custom ENST IDs that override canonical selection
- --vep-path       Folder containing the vep script [~/vep]
+ --vep-path       Folder containing the vep script [~/miniconda3/bin]
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
- --filter-vcf     A VCF for FILTER tag common_variant. Set to 0 to disable [~/.vep/ExAC_nonTCGA.r0.3.1.sites.vep.vcf.gz]
+ --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/91_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
@@ -397,7 +397,7 @@ This script runs a given MAF through maf2vcf to generate per-TN-pair VCFs in a t
 
  Homepage: https://github.com/ckandoth/vcf2maf
  VCF format: http://samtools.github.io/hts-specs/
- MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
+ MAF format: https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format
  VEP: http://ensembl.org/info/docs/tools/vep/index.html
  VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
 
