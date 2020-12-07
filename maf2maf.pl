@@ -16,7 +16,7 @@ use Config;
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 10 );
 my $perl_bin = $Config{perlpath};
 
@@ -385,7 +385,7 @@ __DATA__
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 

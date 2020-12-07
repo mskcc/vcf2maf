@@ -14,7 +14,7 @@ use Config;
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
 
@@ -1152,12 +1152,12 @@ __DATA__
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
  --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
  --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/101_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
  --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
  --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 91, 101) [Default: Installed version]
+ --cache-version  Version of offline cache to use with VEP (e.g. 75, 91, 102) [Default: Installed version]
  --maf-center     Variant calling center to report in MAF [.]
  --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
  --retain-fmt     Comma-delimited names of FORMAT fields to retain as extra columns in MAF []

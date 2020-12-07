@@ -12,8 +12,8 @@ chdir $script_dir;
 
 # Set the number of tests we'll run, and run them
 use Test::Simple tests => 8;
-ok( system( "perl maf2maf.pl --help > /dev/null" ) == 0 );
-ok( system( "perl maf2maf.pl --man > /dev/null" ) == 0 );
+ok( system( "docker run --rm vcf2maf:master perl maf2maf.pl --help > /dev/null" ) == 0 );
+ok( system( "docker run --rm vcf2maf:master perl maf2maf.pl --man > /dev/null" ) == 0 );
 
 # Test standard operation, diff, and cleanup
 ok( system( "perl maf2maf.pl --input-maf tests/test.maf --output-maf tests/test_output.vep_isoforms.new.maf" ) == 0 );

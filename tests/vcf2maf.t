@@ -24,4 +24,4 @@ system( "rm -f tests/test_b38_output.new.maf" );
 # Test some more options, diff, and cleanup
 ok( system( "docker run --rm -v $test_dir:/opt/tests vcf2maf:master perl vcf2maf.pl --inhibit-vep --vep-path /usr/local/bin --vep-data tests --vcf-tumor-id TUMOR --vcf-normal-id NORMAL --tumor-id MSK_T001 --normal-id MSK_N001 --maf-center mskcc.org --vep-forks 1 --buffer-size 50 --ncbi-build GRCh38 --input-vcf tests/test_b38.vep.vcf --output-maf tests/test_b38_output.more.new.maf --ref-fasta tests/Homo_sapiens.GRCh38.dna.chromosome.21.fa --retain-fmt GT" ) == 0 );
 ok( system( "bash -c 'diff <(cut -f1-75,77- tests/test_b38_output.more.maf) <(cut -f1-75,77- tests/test_b38_output.more.new.maf)'" ) == 0 );
-system( "rm -f tests/test_b38_output.more.new.maf" );
+system( "rm -f tests/test_b38_output.more.new.maf tests/test_b38.vep.vcf" );
