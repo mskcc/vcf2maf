@@ -196,10 +196,6 @@ while( my $line = $maf_fh->getline ) {
     $qual = "." if( !defined $qual or $qual eq "" );
     $filter = "." if( !defined $filter or $filter eq "" );
 
-    # If normal alleles are unset in the MAF (quite common), assume homozygous reference
-    $n_al1 = $ref if( $n_al1 eq "" );
-    $n_al2 = $ref if( $n_al2 eq "" );
-
     # Make sure we have at least one variant allele. If not, die with an error
     if( $al1 eq "" and $al2 eq "" ) {
         die "ERROR: MAF line $line_count has no variant allele specified at $chr:$pos!\n";
@@ -218,6 +214,15 @@ while( my $line = $maf_fh->getline ) {
 
     # Blank out the dashes (or other weird chars) used with indels
     ( $ref, $al1, $al2, $n_al1, $n_al2 ) = map{s/^(\?|-|0)+$//; $_} ( $ref, $al1, $al2, $n_al1, $n_al2 );
+
+    # If normal alleles are unset in the MAF (quite common), assume homozygous reference
+    $n_al1 = $ref if( $n_al1 eq "" );
+    $n_al2 = $ref if( $n_al2 eq "" );
+
+    # Do a sanity check on all the alleles
+    unless( $al1=~m/^[ACGT-]*$/ and $al2=~m/^[ACGT-]*$/ and $n_al1=~m/^[ACGT-]*$/ and $n_al2=~m/^[ACGT-]*$/ ) {
+        die "ERROR: MAF line $line_count (at $chr:$pos) contains invalid alleles in Tumor_Seq_Allele or Match_Norm_Seq_Allele columns!\n";
+    }
 
     # To simplify code coming up below, ensure that $al2 is always non-REF
     ( $al1, $al2 ) = ( $al2, $al1 ) if( $al2 eq $ref );
