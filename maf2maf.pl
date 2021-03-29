@@ -274,8 +274,8 @@ if( $retain_cols ) {
             # Prefer Tumor_Seq_Allele2 over Tumor_Seq_Allele1 if both are non-REF
             my $var = (( defined $al2 and $al2 and $al2 ne $ref ) ? $al2 : $al1 );
 
-            # Remove any prefixed reference bps from alleles, using "-" for simple indels
-            while( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
+            # Remove (only one) prefixed reference bp from alleles, using "-" for simple indels
+            if( $ref and $var and substr( $ref, 0, 1 ) eq substr( $var, 0, 1 ) and $ref ne $var ) {
                 ( $ref, $var ) = map{$_ = substr( $_, 1 ); ( $_ ? $_ : "-" )} ( $ref, $var );
                 ++$pos unless( $ref eq "-" );
             }
