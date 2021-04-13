@@ -14,11 +14,9 @@ use Text::Wrap;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite  ) =
-   ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_filter_ac ) =
-    ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 10 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 10 );
 my $perl_bin = $Config{perlpath};
 
 # set default formatting for any output command lines:
