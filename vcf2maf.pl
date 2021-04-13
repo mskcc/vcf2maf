@@ -275,7 +275,7 @@ my ( $split_svs, $var_count ) = ( 0, 0 );
 my $orig_vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
 my $split_vcf_fh = IO::File->new( "$tmp_dir/$input_name.split.vcf", "w" ) or die "ERROR: Couldn't open VCF: $tmp_dir/$input_name.split.vcf!\n";
 
-warn "STATUS: Preprocesing $input_vcf: split SV breakpoints before passing to VEP...\n" if( $verbose );
+warn "STATUS: Preprocessing $input_vcf: split SV breakpoints before passing to VEP...\n" if( $verbose );
 
 while( my $line = $orig_vcf_fh->getline ) {
     # If the file uses Mac OS 9 newlines, quit with an error
@@ -489,13 +489,13 @@ unless( $inhibit_vep ) {
     # Do not use the --regulatory option in situations where we know it will break
     $vep_cmd .= " --regulatory" unless( $species eq "canis_familiaris" or $online );
 
-    warn "STATUS:  running this VEP command:  \n". wrap( "  ", "    ", $vep_cmd. "\n" ) if( $verbose );
+    warn "STATUS: Running this VEP command:  \n". wrap( "  ", "    ", $vep_cmd. "\n" ) if( $verbose );
 
     # Make sure it ran without error codes
     system( $vep_cmd ) == 0 or die "\nERROR: Failed to run the VEP annotator! Command: $vep_cmd\n";
     ( -s $output_vcf ) or warn "WARNING: VEP-annotated VCF file is missing or empty: $output_vcf\n";
 
-    warn "STATUS:  finished with vep...\n" if( $verbose );
+    warn "STATUS: Finished with vep...\n" if( $verbose );
 }
 
 # Define default MAF Header (https://wiki.nci.nih.gov/x/eJaPAQ) with our vcf2maf additions
