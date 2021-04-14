@@ -23,12 +23,6 @@ my $perl_bin = $Config{perlpath};
 $Text::Wrap::huge = 'overflow';
 $Text::Wrap::separator = " \\$/";
 
-# Find out if samtools and tabix are properly installed, and warn the user if it's not
-my ( $samtools ) = map{chomp; $_}`which samtools`;
-( $samtools and -e $samtools ) or die "ERROR: Please install samtools, and make sure it's in your PATH\n";
-my ( $tabix ) = map{chomp; $_}`which tabix`;
-( $tabix and -e $tabix ) or die "ERROR: Please install tabix, and make sure it's in your PATH\n";
-
 # Hash to convert 3-letter amino-acid codes to their 1-letter codes
 my %aa3to1 = qw( Ala A Arg R Asn N Asp D Asx B Cys C Glu E Gln Q Glx Z Gly G His H Ile I Leu L
     Lys K Met M Phe F Pro P Ser S Thr T Trp W Tyr Y Val V Xxx X Ter * );
@@ -201,6 +195,7 @@ unless( @ARGV and $ARGV[0] =~ m/^-/ ) {
 my ( $man, $help, $verbose ) = ( 0, 0, 0 );
 my ( $input_vcf, $output_maf, $tmp_dir, $custom_enst_file );
 my ( $vcf_tumor_id, $vcf_normal_id, $remap_chain );
+my ( $samtools, $tabix, $liftover ) ;
 GetOptions(
     'help!' => \$help,
     'man!' => \$man,
@@ -234,10 +229,34 @@ GetOptions(
     'min-hom-vaf=s' => \$min_hom_vaf,
     'remap-chain=s' => \$remap_chain,
     'filter-vcf=s' => \$filter_vcf,
-    'max-filter-ac=i' => \$max_filter_ac
+    'max-filter-ac=i' => \$max_filter_ac,
+    'samtools-exec=s' => \$samtools,
+    'tabix-exec=s' => \$tabix,
+    'liftover-exec=s' => \$liftover,
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
+
+# If not specified on the command line, search PATH for samtools and tabix
+# Error out if either is missing or the specified exec doesn't exist.
+
+( $samtools ) = map{chomp; $_}`which samtools` unless ( $samtools ) ;
+( $samtools ) or die "ERROR: Please install samtools on your PATH, or specify --samtools-exec\n";
+( -e $samtools ) or die "ERROR: Specified samtools: <$samtools> does not exist\n";
+
+( $tabix ) = map{chomp; $_}`which tabix` unless ( $tabix );
+( $tabix ) or die "ERROR: Please install tabix on your PATH, or specify --tabix-exec\n";
+( -e $tabix ) or die "ERROR: Specified tabix: <$tabix> does not exist\n";
+
+if( $remap_chain ) {
+    # When we're attempting a liftOver:
+    # Search the PATH for a default executable if it's not specified on the command line
+    # Die if the value remains unset, or if the value we have doesn't  exist
+
+    ( $liftover ) = map{chomp; $_}`which liftOver` unless ( $liftover );
+    ( $liftover ) or die "ERROR: Please install liftOver on your PATH or specify --liftover-exec\n";
+    ( -e $liftover ) or die "ERROR: Specified liftOver: <$liftover> does not exist\n";
+}
 
 # Check if required arguments are missing or problematic
 ( defined $input_vcf and defined $output_maf ) or die "ERROR: Both input-vcf and output-maf must be defined!\n";
@@ -332,11 +351,6 @@ if( $online ) {
 my ( %remap );
 if( $remap_chain ) {
     warn "STATUS: Running liftOver...\n" if( $verbose );
-
-    # Find out if liftOver is properly installed, and warn the user if it's not
-    my $liftover = `which liftOver`;
-    chomp( $liftover );
-    ( $liftover and -e $liftover ) or die "ERROR: Please install liftOver, and make sure it's in your PATH\n";
 
     # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
     `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/$input_name.bed`;
@@ -1210,6 +1224,9 @@ __DATA__
  --retain-ann     Comma-delimited names of annotations (within the VEP CSQ/ANN) to retain as extra columns in MAF []
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --remap-chain    Chain file to remap variants to a different assembly before running VEP
+ --samtools-exec  Path to the samtools executable; Looks on PATH by default []
+ --tabix-exec     Path to the tabix executable; Looks on PATH by default []
+ --liftover-exec  Path to the liftover executable; Looks on PATH by default []
  --verbose        Print more things to log progress.
  --help           Print a brief help message and quit
  --man            Print the detailed manual
