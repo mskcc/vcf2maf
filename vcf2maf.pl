@@ -15,11 +15,11 @@ use Text::Wrap;
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 10 );
+my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 0.0004 );
 my $perl_bin = $Config{perlpath};
 
-# set default formatting for any output command lines:
+# Set default formatting for any output command lines:
 $Text::Wrap::huge = 'overflow';
 $Text::Wrap::separator = " \\$/";
 
@@ -233,8 +233,7 @@ GetOptions(
     'retain-ann=s' => \$retain_ann,
     'min-hom-vaf=s' => \$min_hom_vaf,
     'remap-chain=s' => \$remap_chain,
-    'filter-vcf=s' => \$filter_vcf,
-    'max-filter-ac=i' => \$max_filter_ac
+    'max-subpop-af=f' => \$max_subpop_af
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -370,11 +369,10 @@ if( $remap_chain ) {
     $input_vcf = "$tmp_dir/$input_name.remap.vcf";
 }
 
-# Before running annotation, let's pull flanking reference bps for each variant to do some checks,
-# and we'll also pull out overlapping calls from the filter VCF
-warn "STATUS: Pulling flanking reference bps for checks and pulling out overlapping calls...\n" if( $verbose );
+# Before running annotation, let's pull flanking reference bps for each variant to do some checks
+warn "STATUS: Pulling flanking reference bps for checks...\n" if( $verbose );
 my $vcf_fh = IO::File->new( $input_vcf ) or die "ERROR: Couldn't open --input-vcf: $input_vcf!\n";
-my ( %ref_bps, @ref_regions, %uniq_loci, %uniq_regions, %flanking_bps, %filter_data );
+my ( %ref_bps, @ref_regions, %uniq_regions, %flanking_bps );
 while( my $line = $vcf_fh->getline ) {
     # Skip header lines, and pull variant loci to pass to samtools later
     next if( $line =~ m/^#/ );
@@ -385,7 +383,6 @@ while( my $line = $vcf_fh->getline ) {
     $ref_bps{$region} = $ref;
     push( @ref_regions, $region );
     $uniq_regions{$region} = 1;
-    $uniq_loci{"$chr:$pos-$pos"} = 1;
 }
 $vcf_fh->close;
 
@@ -411,25 +408,6 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 # Or it's also possible that an outdated samtools was unable to parse the gzipped FASTA files
 # ::NOTE:: If input had no variants, don't break here, so we can continue to create an empty MAF
 ( !@regions_split or %flanking_bps ) or die "ERROR: You're either using an outdated samtools, or --ref-fasta is not the same genome build as your --input-vcf.";
-
-if( $filter_vcf ) {
-    ( -s $filter_vcf ) or die "ERROR: Provided --filter-vcf is missing or empty: $filter_vcf\n";
-    # Query each variant locus on the filter VCF, using tabix, just like we used samtools earlier
-    ( $lines, @regions_split ) = ( "", ());
-    my @regions = keys %uniq_loci;
-    push( @regions_split, [ splice( @regions, 0, $buffer_size ) ] ) while @regions;
-    # ::NOTE:: chr-prefix removal works safely here because ExAC is limited to 1..22, X, Y
-    map{ my $loci = join( " ", map{s/^chr//; $_} @{$_} ); $lines .= `$tabix $filter_vcf $loci` } @regions_split;
-    foreach my $line ( split( "\n", $lines )) {
-        my ( $chr, $pos, undef, $ref, $alt, undef, $filter, $info_line ) = split( "\t", $line );
-        # Parse out data from info column, and store it for later, along with REF, ALT, and FILTER
-        my $locus = ( $chr_prefix_in_use ? "chr$chr:$pos" : "$chr:$pos" );
-        %{$filter_data{$locus}} = map {( m/=/ ? ( split( /=/, $_, 2 )) : ( $_, "1" ))} split( /\;/, $info_line );
-        $filter_data{$locus}{REF} = $ref;
-        $filter_data{$locus}{ALT} = $alt;
-        $filter_data{$locus}{FILTER} = $filter;
-    }
-}
 
 # For each variant locus and reference allele in the input VCF, report any problems
 warn "STATUS: Reporting any problems on variant loci and reference alleles...\n" if( $verbose );
@@ -516,11 +494,8 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen
     EXON INTRON DOMAINS AF AFR_AF AMR_AF ASN_AF EAS_AF EUR_AF SAS_AF AA_AF EA_AF CLIN_SIG SOMATIC
     PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL
-    HGVS_OFFSET PHENO MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE
-    ExAC_AF_OTH ExAC_AF_SAS GENE_PHENO FILTER flanking_bps vcf_id vcf_qual ExAC_AF_Adj
-    ExAC_AC_AN_Adj ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS ExAC_AC_AN_FIN
-    ExAC_AC_AN_NFE ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER gnomAD_AF gnomAD_AFR_AF gnomAD_AMR_AF
-    gnomAD_ASJ_AF gnomAD_EAS_AF gnomAD_FIN_AF gnomAD_NFE_AF gnomAD_OTH_AF gnomAD_SAS_AF );
+    HGVS_OFFSET PHENO MINIMISED GENE_PHENO FILTER flanking_bps vcf_id vcf_qual gnomAD_AF gnomAD_AFR_AF
+    gnomAD_AMR_AF gnomAD_ASJ_AF gnomAD_EAS_AF gnomAD_FIN_AF gnomAD_NFE_AF gnomAD_OTH_AF gnomAD_SAS_AF );
 
 # push any requested custom VEP annotations from the CSQ/ANN section into @ann_cols
 if ($retain_ann) {
@@ -887,53 +862,16 @@ while( my $line = $annotated_vcf_fh->getline ) {
         $maf_line{all_effects} .= "$gene_name,$effect_type,$protein_change,$transcript_id,$refseq_ids;" if( $effect_type and $transcript_id );
     }
 
-    # If this variant was seen in the ExAC VCF, let's report allele counts and frequencies
-    # ExAC merges and pads multiallelic sites, so we need to normalize each variant, (remove common
-    # suffixed bps) before we compare it to our variant allele
-    my $locus = "$chrom:$vcf_pos";
-    if( defined $filter_data{$locus} ) {
-        my $idx = 0;
-        $maf_line{ExAC_FILTER} = $filter_data{$locus}{FILTER};
-        foreach my $f_var ( split( ",", $filter_data{$locus}{ALT} )) {
-            my $f_ref = $filter_data{$locus}{REF};
-            # De-pad suffixed bps that are identical between ref/var alleles
-            while( $f_ref and $f_var and substr( $f_ref, -1, 1 ) eq substr( $f_var, -1, 1 ) and $f_ref ne $f_var ) {
-                ( $f_ref, $f_var ) = map{substr( $_, 0, -1 )} ( $f_ref, $f_var );
-            }
-            # If this normalized variant matches our input variant, report its allele counts
-            # ExAC reports MNPs as separate SNPs. So we'll need to report the ACs of the first SNP
-            if(( $vcf_ref eq $f_ref and $vcf_var eq $f_var ) or
-              (( $var_type eq "DNP" or $var_type eq "TNP" or $var_type eq "ONP") and
-               ( $vcf_ref =~ m/^$f_ref/ and $vcf_var =~ m/^$f_var/ ))) {
-                my @var_acs = split( ",", $filter_data{$locus}{AC} );
-                my $var_ac = $var_acs[$idx];
-                my $pop_an = $filter_data{$locus}{AN};
-                $maf_line{ExAC_AF} = sprintf( "%.4g", ( $pop_an ? ( $var_ac / $pop_an ) : 0 ));
-                $maf_line{ExAC_AC_AN} = join( "/", $var_ac, $pop_an );
-                # Do the same for AC/AN in each subpopulation, and the adjusted total AC/AN (Adj)
-                foreach my $subpop ( qw( AFR AMR EAS FIN NFE OTH SAS Adj )) {
-                    @var_acs = split( ",", $filter_data{$locus}{"AC_$subpop"} );
-                    $var_ac = $var_acs[$idx];
-                    $pop_an = $filter_data{$locus}{"AN_$subpop"};
-                    $maf_line{"ExAC_AF_$subpop"} = sprintf( "%.4g", ( $pop_an ? ( $var_ac / $pop_an ) : 0 ));
-                    $maf_line{"ExAC_AC_AN_$subpop"} = join( "/", $var_ac, $pop_an );
-                }
-                last;
-            }
-            ++$idx;
-        }
-    }
-
-    # Copy FILTER from input VCF, and tag calls with high allele counts in any ExAC subpopulation
+    # Copy FILTER from input VCF, and tag calls with high allele freq in any gnomAD subpopulation
     my $subpop_count = 0;
-    # Remove existing common_variant tags from input, so it's redefined by our criteria here
-    $filter = join( ";", grep{ $_ ne "common_variant" } split( /,|;/, $filter ));
-    foreach my $subpop ( qw( AFR AMR EAS FIN NFE OTH SAS )) {
-        if( $maf_line{"ExAC_AC_AN_$subpop"} ) {
-            my ( $subpop_ac ) = split( "/", $maf_line{"ExAC_AC_AN_$subpop"} );
-            $subpop_count++ if( $subpop_ac > $max_filter_ac );
+    foreach my $subpop ( qw( AFR AMR ASJ EAS FIN NFE SAS )) {
+        if( $maf_line{"gnomAD_$subpop\_AF"} ) {
+            my ( $subpop_af ) = split( "/", $maf_line{"gnomAD_$subpop\_AF"} );
+            $subpop_count++ if( $subpop_af > $max_subpop_af );
         }
     }
+    # Remove existing common_variant tags from input, so it's redefined by this new criteria
+    $filter = join( ";", grep{ $_ ne "common_variant" } split( /,|;/, $filter ));
     if( $subpop_count > 0 ) {
         $filter = (( $filter eq "PASS" or $filter eq "." or !$filter ) ? "common_variant" : "$filter;common_variant" );
     }
@@ -1192,15 +1130,14 @@ __DATA__
  --vep-data       VEP's base cache/plugin directory [~/.vep]
  --vep-forks      Number of forked processes to use when running VEP [4]
  --vep-custom     String to pass into VEP's --custom option []
- --vep-config     VEP config file to pass into vep's --config option []
- --vep-overwrite  Allow VEP to overwrite output if it exists
+ --vep-config     Config file to pass into VEP's --config option []
+ --vep-overwrite  Allow VEP to overwrite output VCF if it exists
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
  --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
  --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
  --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
- --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
- --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
+ --max-subpop-af  Add FILTER tag common_variant if gnomAD reports any subpopulation AFs greater than this [0.0004]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 91, 102) [Default: Installed version]
@@ -1210,10 +1147,9 @@ __DATA__
  --retain-ann     Comma-delimited names of annotations (within the VEP CSQ/ANN) to retain as extra columns in MAF []
  --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
  --remap-chain    Chain file to remap variants to a different assembly before running VEP
- --verbose        Print more things to log progress.
+ --verbose        Print more things to log progress
  --help           Print a brief help message and quit
  --man            Print the detailed manual
-
 
 =head1 DESCRIPTION
 
