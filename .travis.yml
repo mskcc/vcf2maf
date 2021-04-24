@@ -5,10 +5,10 @@ services: docker
 
 branches:
   only:
-    - master
+    - main
 
 install:
-  - docker build -t vcf2maf:master .
+  - docker build -t vcf2maf:main .
   - docker image prune -f
   - wget -P tests https://data.cyri.ac/Homo_sapiens.GRCh38.dna.chromosome.21.fa.gz
   - gzip -d tests/Homo_sapiens.GRCh38.dna.chromosome.21.fa.gz
