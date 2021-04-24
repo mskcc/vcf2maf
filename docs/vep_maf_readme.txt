@@ -81,39 +81,21 @@ http://useast.ensembl.org/info/docs/tools/vep/vep_formats.html#output
 97. HGVS_OFFSET - Indicates by how many bases the HGVS notations for this variant have been shifted
 98. PHENO - Indicates if existing variant is associated with a phenotype, disease or trait
 99. MINIMISED - Alleles in this variant have been converted to minimal representation before consequence calculation
-100. ExAC_AF - Global Allele Frequency from ExAC
-101. ExAC_AF_AFR - African/African American Allele Frequency from ExAC
-102. ExAC_AF_AMR - American Allele Frequency from ExAC
-103. ExAC_AF_EAS - East Asian Allele Frequency from ExAC
-104. ExAC_AF_FIN - Finnish Allele Frequency from ExAC
-105. ExAC_AF_NFE - Non-Finnish European Allele Frequency from ExAC
-106. ExAC_AF_OTH - Other Allele Frequency from ExAC
-107. ExAC_AF_SAS - South Asian Allele Frequency from ExAC
-108. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
-109. FILTER - Copied from input MAF/VCF, with ExAC-based common_variant tag added, as explained below
-110. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
-111. variant_id - The ID from an input VCF, or the variant_id from an input MAF
-112. variant_qual - The QUAL from an input VCF, or the variant_qual from an input MAF
-113. ExAC_AF_Adj - Global Adjusted Allele frequency from ExAC
-114. ExAC_AC_AN_Adj - Global Adjusted Allele Count and Number from ExAC
-115. ExAC_AC_AN - Global Allele Count and Number from ExAC
-116. ExAC_AC_AN_AFR - African/African American Allele Count and Number from ExAC
-117. ExAC_AC_AN_AMR - American Allele Count and Number from ExAC
-118. ExAC_AC_AN_EAS - East Asian Allele Count and Number from ExAC
-119. ExAC_AC_AN_FIN - Finnish Allele Count and Number from ExAC
-120. ExAC_AC_AN_NFE - Non-Finnish European Allele Count and Number from ExAC
-121. ExAC_AC_AN_OTH - Other Allele Count and Number from ExAC
-122. ExAC_AC_AN_SAS - South Asian Allele Count and Number from ExAC
-123. ExAC_FILTER - FILTER tags retrieved from ExAC VCF; PASS means ExAC thinks it's germline
-124. gnomAD_AF - Frequency of existing variant in gnomAD exomes combined population
-125. gnomAD_AFR_AF - Frequency of existing variant in gnomAD exomes African/American population
-126. gnomAD_AMR_AF - Frequency of existing variant in gnomAD exomes American population
-127. gnomAD_ASJ_AF - Frequency of existing variant in gnomAD exomes Ashkenazi Jewish population
-128. gnomAD_EAS_AF - Frequency of existing variant in gnomAD exomes East Asian population
-129. gnomAD_FIN_AF - Frequency of existing variant in gnomAD exomes Finnish population
-130. gnomAD_NFE_AF - Frequency of existing variant in gnomAD exomes Non-Finnish European population
-131. gnomAD_OTH_AF - Frequency of existing variant in gnomAD exomes combined other combined populations
-132. gnomAD_SAS_AF - Frequency of existing variant in gnomAD exomes South Asian population
+100. GENE_PHENO - Indicates if gene that the variant maps to is associated with a phenotype, disease or trait
+101. FILTER - Copied from input MAF/VCF, with gnomAD-based common_variant tag added, as explained below
+102. flanking_bps - The reference allele per VCF specs, and its 2 flanking base pairs
+103. variant_id - The ID from an input VCF, or the variant_id from an input MAF
+104. variant_qual - The QUAL from an input VCF, or the variant_qual from an input MAF
+105. gnomAD_AF - Frequency of existing variant in gnomAD exomes combined population
+106. gnomAD_AFR_AF - Frequency of existing variant in gnomAD exomes African/American population
+107. gnomAD_AMR_AF - Frequency of existing variant in gnomAD exomes American population
+108. gnomAD_ASJ_AF - Frequency of existing variant in gnomAD exomes Ashkenazi Jewish population
+109. gnomAD_EAS_AF - Frequency of existing variant in gnomAD exomes East Asian population
+110. gnomAD_FIN_AF - Frequency of existing variant in gnomAD exomes Finnish population
+111. gnomAD_NFE_AF - Frequency of existing variant in gnomAD exomes Non-Finnish European population
+112. gnomAD_OTH_AF - Frequency of existing variant in gnomAD exomes combined other combined populations
+113. gnomAD_SAS_AF - Frequency of existing variant in gnomAD exomes South Asian population
+114. vcf_pos - Value of POS from input VCF; useful if altered by liftOver or MAF conversion
 
 To distinguish driver mutations from passenger mutations, the most relevant columns are:
 
@@ -132,12 +114,7 @@ These are some other columns to help shortlist variants worth looking into:
 72. SIFT - the SIFT prediction and/or score, with both given as prediction (score).
 73. PolyPhen - the PolyPhen prediction and/or score.
 109. FILTER - False-positive filtering status, copied from the input MAF/VCF. An additional filter
-      named common_variant is also appended, if allele count across at least one ExAC subpopulation
-      is >10 (this default cutoff can be changed when running vcf2maf). So if you're handling
+      named common_variant is also appended, if allele frequency across at least one gnomAD subpopulation
+      is >0.04% (this cutoff can be changed when running vcf2maf or maf2maf). So if you're handling
       somatic variants, the common_variant tag means this is likely a false-positive. It is less
-      likely to be a legit somatic variant at a site that ExAC classifies as germline or artifact.
-123. ExAC_FILTER - FILTER tags copied from the ExAC VCF. Differentiates between what ExAC classifies
-      as germline (tagged as "PASS") or artifact (one or more tags, but not "PASS").
-113. ExAC_AF_Adj - Global allele frequency across the ExAC population, adjusted for samples where
-      this position could be genotyped at high quality. If you're handling germline variants, then
-      this tells you how common or rare the variant is.
+      likely to be a legit somatic variant at a site that gnomAD classifies as germline.
