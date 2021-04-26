@@ -1328,7 +1328,7 @@ For example, below we have Short_name of I<MY_Ann> and VCF_fields of I<AD,TOPMED
 
 Skip running VEP, but extract VEP annotation in VCF if found
 
-=item B<--vep-path>=I<PATH_TO_VEP_EXEC>
+=item B<--vep-path>=I<PATH_TO_VEP_DIR>
 
 Folder containing the vep script [~/miniconda3/bin]
 
