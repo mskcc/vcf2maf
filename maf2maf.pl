@@ -17,7 +17,7 @@ my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_al
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0 );
 my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
-my ( $species, $ncbi_build, $cache_version, $maf_center, $max_filter_ac ) = ( "homo_sapiens", "GRCh37", "", ".", 10 );
+my ( $species, $ncbi_build, $cache_version, $maf_center, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", 0.0004 );
 my $perl_bin = $Config{perlpath};
 
 # Columns that can be safely borrowed from the input MAF
@@ -75,8 +75,7 @@ GetOptions(
     'ncbi-build=s' => \$ncbi_build,
     'cache-version=s' => \$cache_version,
     'ref-fasta=s' => \$ref_fasta,
-    'filter-vcf=s' => \$filter_vcf,
-    'max-filter-ac=i' => \$max_filter_ac
+    'max-subpop-af=f' => \$max_subpop_af
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
 pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
@@ -227,9 +226,8 @@ foreach my $tn_vcf ( @vcfs ) {
     $tn_maf =~ s/.vep.vcf$/.vep.maf/;
     my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf --inhibit-vep" .
         " --tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data" .
-        " --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species --max-filter-ac $max_filter_ac";
+        " --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species --max-subpop-af $max_subpop_af";
     $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
-    $vcf2maf_cmd .= " --filter-vcf $filter_vcf" if( $filter_vcf );
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf! Command: $vcf2maf_cmd\n";
 }
 
@@ -380,8 +378,7 @@ __DATA__
  --vep-forks      Number of forked processes to use when running VEP [4]
  --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
  --any-allele     When reporting co-located variants, allow mismatched variant alleles too
- --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
- --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
+ --max-subpop-af  Add FILTER tag common_variant if gnomAD reports any subpopulation AFs greater than this [0.0004]
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
