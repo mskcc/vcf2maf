@@ -1251,10 +1251,6 @@ If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.
 
 A VCF for FILTER tag common_variant; Disabled by default []
 
-=item B<--man>
-
-Print the detailed manual with advanced options
-
 =back
 
 =head2 CUSTOMIZED OUTPUT
