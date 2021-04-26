@@ -234,11 +234,14 @@ GetOptions(
     'tabix-exec=s' => \$tabix,
     'liftover-exec=s' => \$liftover,
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
-pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
-pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 
-# If not specified on the command line, search PATH for samtools and tabix
-# Error out if either is missing or the specified exec doesn't exist.
+if( $man ) {
+    pod2usage( -verbose => 2, exitval => 0)
+}
+pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
+
+# Search the PATH for samtools and tabix, unless specified on the command line.
+# Error out if either is missing from PATH or the specified exec doesn't exist.
 
 ( $samtools ) = map{chomp; $_}`which samtools` unless ( $samtools ) ;
 ( $samtools ) or die "ERROR: Please install samtools on your PATH, or specify --samtools-exec\n";
@@ -249,9 +252,9 @@ pod2usage( -verbose => 2, -input => \*DATA, -exitval => 0 ) if( $man );
 ( -e $tabix ) or die "ERROR: Specified tabix: <$tabix> does not exist\n";
 
 if( $remap_chain ) {
-    # When we're attempting a liftOver:
-    # Search the PATH for a default executable if it's not specified on the command line
-    # Die if the value remains unset, or if the value we have doesn't  exist
+    # When we're attempting a remap:
+    # Search the PATH for a liftOver executable, unless specified on the command line.
+    # Error out if liftOver is missing from PATH or the specified exec doesn't exist.
 
     ( $liftover ) = map{chomp; $_}`which liftOver` unless ( $liftover );
     ( $liftover ) or die "ERROR: Please install liftOver on your PATH or specify --liftover-exec\n";
@@ -1185,66 +1188,276 @@ __DATA__
 
 =head1 NAME
 
- vcf2maf.pl - Convert a VCF into a MAF by mapping each variant to only one of all possible gene isoforms
+B<vcf2maf.pl> - Convert a VCF into a MAF by mapping each variant to only one of
+all possible gene isoforms
 
 =head1 SYNOPSIS
 
  perl vcf2maf.pl --help
- perl vcf2maf.pl --input-vcf WD4086.vcf --output-maf WD4086.maf --tumor-id WD4086 --normal-id NB4086
 
-=head1 OPTIONS
-
- --input-vcf      Path to input file in VCF format
- --output-maf     Path to output MAF file
- --tmp-dir        Folder to retain intermediate VCFs after runtime [Default: Folder containing input VCF]
- --tumor-id       Tumor_Sample_Barcode to report in the MAF [TUMOR]
- --normal-id      Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
- --vcf-tumor-id   Tumor sample ID used in VCF's genotype columns [--tumor-id]
- --vcf-normal-id  Matched normal ID used in VCF's genotype columns [--normal-id]
- --custom-enst    List of custom ENST IDs that override canonical selection
- --vep-path       Folder containing the vep script [~/miniconda3/bin]
- --vep-data       VEP's base cache/plugin directory [~/.vep]
- --vep-forks      Number of forked processes to use when running VEP [4]
- --vep-custom     String to pass into VEP's --custom option []
- --vep-config     VEP config file to pass into vep's --config option []
- --vep-overwrite  Allow VEP to overwrite output if it exists
- --buffer-size    Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
- --any-allele     When reporting co-located variants, allow mismatched variant alleles too
- --inhibit-vep    Skip running VEP, but extract VEP annotation in VCF if found
- --online         Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
- --filter-vcf     A VCF for FILTER tag common_variant; Disabled by default []
- --max-filter-ac  Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
- --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
- --ncbi-build     NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
- --cache-version  Version of offline cache to use with VEP (e.g. 75, 91, 102) [Default: Installed version]
- --maf-center     Variant calling center to report in MAF [.]
- --retain-info    Comma-delimited names of INFO fields to retain as extra columns in MAF []
- --retain-fmt     Comma-delimited names of FORMAT fields to retain as extra columns in MAF []
- --retain-ann     Comma-delimited names of annotations (within the VEP CSQ/ANN) to retain as extra columns in MAF []
- --min-hom-vaf    If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
- --remap-chain    Chain file to remap variants to a different assembly before running VEP
- --samtools-exec  Path to the samtools executable; Looks on PATH by default []
- --tabix-exec     Path to the tabix executable; Looks on PATH by default []
- --liftover-exec  Path to the liftover executable; Looks on PATH by default []
- --verbose        Print more things to log progress.
- --help           Print a brief help message and quit
- --man            Print the detailed manual
+ perl vcf2maf.pl --input-vcf INPUT.vcf --output-maf OUTPUT.maf --tumor-id TUMOR_ID --normal-id NORMAL_ID
 
 
 =head1 DESCRIPTION
 
-To convert a VCF into a MAF, each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. This selection of a single effect per variant, is often subjective. So this project is an attempt to make the selection criteria smarter, reproducible, and more configurable.
+To convert a VCF into a MAF, each variant must be mapped to only one of all
+possible gene transcripts/isoforms that it might affect. This selection of
+a single effect per variant, is often subjective. This project is an
+attempt to make the selection criteria smarter, reproducible, and more
+configurable.
 
-This script uses VEP, a variant annotator that maps effects of a variant on all possible genes and transcripts. For more info, see the README.
+This script uses Ensembl's VEP, a variant annotator that maps effects of a variant on
+all possible genes and transcripts. For more info, see the README or
+L<https://ensembl.org/info/docs/tools/vep/index.html>.
 
-=head2 Relevant links:
+=head1 OPTIONS
 
- Homepage: https://github.com/ckandoth/vcf2maf
- VCF format: http://samtools.github.io/hts-specs/
- MAF format: https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format
- VEP: http://ensembl.org/info/docs/tools/vep/index.html
- VEP annotated VCF format: http://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout
+=over 8
+
+=item B<--help>
+
+Print a basic help message
+
+=item B<--verbose>
+
+Print more things to STDERR to log progress
+
+=item B<--input-vcf>=I<INPUT_VCF>
+
+Path to input file in VCF format
+
+=item B<--output-maf>=I<OUTPUT_VCF>
+
+Path to output MAF file
+
+=item B<--tmp-dir>=I<TMP_DIR>
+
+Folder to retain intermediate VCFs after runtime [Default: Folder containing input VCF]
+
+=item B<--tumor-id>=I<TUMOR_ID>
+
+Tumor_Sample_Barcode to report in the MAF [TUMOR]
+
+=item B<--normal-id>=I<NORMAL_ID>
+
+Matched_Norm_Sample_Barcode to report in the MAF [NORMAL]
+
+=item B<--vcf-tumor-id>=I<TUMOR_ID>
+
+Tumor sample ID used in VCF's genotype columns [--tumor-id]
+
+=item B<--vcf-normal-id>=I<NORMAL_ID>
+
+Matched normal ID used in VCF's genotype columns [--normal-id]
+
+=item B<--online>
+
+Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listing <100 events)
+
+=item B<--ref-fasta>=I<FASTA>
+
+Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+
+=item B<--species>=I<SPECIES>
+
+Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
+
+=item B<--ncbi-build>=I<ASSEMBLY>
+
+NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
+
+=item B<--cache-version>=I<N>
+
+Version of offline cache to use with VEP (e.g. 75, 91, 102) [Default: Installed version]
+
+=item B<--remap-chain>=I<REMAP_CHAIN>
+
+Chain file to remap variants to a different assembly before running VEP
+
+=item B<--man>
+
+Print the detailed manual with advanced options
+
+
+=back
+
+=head1 ADVANCED OPTIONS
+
+=head2 OUTPUT FILTERING
+
+=over 8
+
+=item B<--any-allele>
+
+When reporting co-located variants, allow mismatched variant alleles too
+
+=item B<--max-filter-ac>=I<N>
+
+Use tag common_variant if the filter-vcf reports a subpopulation AC higher than this [10]
+
+=item B<--maf-center>=I<CENTER_NAME>
+
+Variant calling center to report in MAF [.]
+
+=item B<--min-hom-vaf>=I<N>
+
+If GT undefined in VCF, minimum allele fraction to call a variant homozygous [0.7]
+
+=item B<--filter-vcf>=I<FILTER_VCF>
+
+A VCF for FILTER tag common_variant; Disabled by default []
+
+=item B<--man>
+
+Print the detailed manual with advanced options
+
+=back
+
+=head2 CUSTOMIZED OUTPUT
+
+=over 8
+
+=item B<--custom-enst>=I<LIST>
+
+Comma-delimited list of custom ENST IDs that override canonical selection []
+
+=item B<--retain-info>=I<LIST>
+
+Comma-delimited names of INFO fields to retain as extra columns in MAF []
+
+=item B<--retain-fmt>=I<LIST>
+
+Comma-delimited names of FORMAT fields to retain as extra columns in MAF []
+
+=item B<--retain-ann>=I<LIST>
+
+Comma-delimited names of VEP annotations (within the VEP CSQ/ANN) to retain as extra columns in MAF []
+
+=item B<--vep-custom>=I<VEP_CUSTOM_STRING>
+
+String to pass into VEP's --custom option [] (see L<CUSTOMIZED VEP ANNOTATION> below)
+
+=item B<--vep-config>=I<VEP_CUSTOM_STRING>
+
+VEP config file to pass into vep's --config option [] (see L<CUSTOMIZED VEP ANNOTATION> below)
+
+=back
+
+=head3 CUSTOMIZED VEP ANNOTATION
+
+=over 2
+
+VEP's customization options are described at:
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
+
+The custom VEP output is saved in the B<INFO> section of the VCF line, as part of the B<CSQ=> section.
+
+To retain the customized output in the MAF file, in addition to specifing the custom annoation
+and fields with B<--vep-custom> , we need to specify the fields to retain with B<--retain-ann>.
+
+VEP's B<--custom>=I<STRING> is a comma-separated string:
+
+Filename,I<Short_name>,File_type,Annotation_type,Force_report_coordinates,I<VCF_fields>
+
+where I<Short_name> is a prefix for the annotations and I<VCF_fields> is a
+comma-separated list of the annotations to include.
+
+For each annotation we want to retain, we add I<Short_name>B<_>I<VCF_FIELD>
+to the B<--retain-ann> and delimit them with commas.
+
+For example, below we have Short_name of I<MY_Ann> and VCF_fields of I<AD,TOPMED>
+
+=over 8
+
+--vep-custom my_ann.vcf,I<MY_Ann>,vcf,exact,,I<AD,TOPMED>
+
+--retain-ann I<MY_Ann>B<_>I<AD>,I<MY_Ann>B<_>I<TOPMED>
+
+=back
+
+=back
+
+=head2 SUBPROCESSES
+
+=head3 VEP CUSTOMIZATION
+
+=over 8
+
+=item B<--inhibit-vep>
+
+Skip running VEP, but extract VEP annotation in VCF if found
+
+=item B<--vep-path>=I<PATH_TO_VEP_EXEC>
+
+Folder containing the vep script [~/miniconda3/bin]
+
+=item B<--vep-data>=I<PATH_TO_VEP_CACHE>
+
+VEP's base cache/plugin directory [~/.vep]
+
+=item B<--vep-forks>=I<N>
+
+Number of forked processes to use when running VEP [4]
+
+=item B<--vep-overwrite>
+
+Allow VEP to overwrite annotated output (if it exists)
+
+=item B<--buffer-size>=I<N>
+
+Number of variants VEP loads at a time; Reduce this for low memory systems [5000]
+
+=back
+
+
+=head3 SUBPROCESS EXECUTABLES
+
+=over 8
+
+=item B<--samtools-exec>=I<PATH_TO_SAMTOOLS_EXEC>
+
+Path to the samtools executable [Looks on PATH by default]
+
+=item B<--tabix-exec>=I<PATH_TO_TABIX_EXEC>
+
+Path to the tabix executable [Looks on PATH by default]
+
+=item B<--liftover-exec>=I<PATH_TO_LIFTOVER_EXEC>
+
+Path to the liftover executable [Looks on PATH by default]
+
+=back
+
+=head2 RELEVANT LINKS:
+
+=over 8
+
+=item B<vcf2maf> homepage:
+
+L<https://github.com/ckandoth/vcf2maf>
+
+=item VCF format:
+
+L<https://samtools.github.io/hts-specs/>
+
+=item MAF format:
+
+L<https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format>
+
+=item Variant Effect Predictor (VEP):
+
+L<https://ensembl.org/info/docs/tools/vep/index.html>
+
+=item VEP annotated VCF format:
+
+L<https://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout>
+
+=item VEP customized output:
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
+
+=back
 
 =head1 AUTHORS
 
