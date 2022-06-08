@@ -459,7 +459,8 @@ unless( $inhibit_vep ) {
     my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build";
     $vep_cmd .= " --no_progress" unless( $verbose );
     $vep_cmd .= " --no_stats" unless( $vep_stats );
-    $vep_cmd .= " --buffer_size $buffer_size --sift b --ccds";    $vep_cmd .= " --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical";
+    $vep_cmd .= " --buffer_size $buffer_size --sift b --ccds";
+    $vep_cmd .= " --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical";
     $vep_cmd .= " --protein --biotype --uniprot --tsl --variant_class --shift_hgvs 1";
     $vep_cmd .= " --check_existing --total_length --allele_number --no_escape --xref_refseq";
     $vep_cmd .= " --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length";
