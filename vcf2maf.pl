@@ -14,7 +14,7 @@ use Text::Wrap;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 );
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 , 0);
 my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 0.0004 );
 my $perl_bin = $Config{perlpath};
@@ -214,6 +214,7 @@ GetOptions(
     'vep-custom=s' => \$vep_custom,
     'vep-config=s' => \$vep_config,
     'vep-overwrite!' => \$vep_overwrite,
+    'vep-stats' => \$vep_stats,
     'buffer-size=i' => \$buffer_size,
     'any-allele!' => \$any_allele,
     'inhibit-vep!' => \$inhibit_vep,
@@ -457,8 +458,8 @@ unless( $inhibit_vep ) {
     # Contruct VEP command using some default options and run it
     my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build";
     $vep_cmd .= " --no_progress" unless( $verbose );
-    $vep_cmd .= " --no_stats --buffer_size $buffer_size --sift b --ccds";
-    $vep_cmd .= " --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical";
+    $vep_cmd .= " --no_stats" unless( $vep_stats );
+    $vep_cmd .= " --buffer_size $buffer_size --sift b --ccds";    $vep_cmd .= " --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical";
     $vep_cmd .= " --protein --biotype --uniprot --tsl --variant_class --shift_hgvs 1";
     $vep_cmd .= " --check_existing --total_length --allele_number --no_escape --xref_refseq";
     $vep_cmd .= " --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length";
@@ -1334,6 +1335,10 @@ Number of forked processes to use when running VEP [4]
 =item B<--vep-overwrite>
 
 Allow VEP to overwrite annotated output (if it exists)
+
+=item B<--vep-stats>
+
+Allow VEP to generate stats (slower, disabled by default)
 
 =item B<--buffer-size>=I<N>
 
