@@ -96,8 +96,8 @@ if( $remap_chain ) {
     ( $liftover and -e $liftover ) or die "ERROR: Please install liftOver, and make sure it's in your PATH\n";
 
     # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
-    `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/input.bed`;
-    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/input.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
+    `grep -v ^# '$input_vcf' | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > '$tmp_dir/input.bed'`;
+    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`'$liftover' '$tmp_dir/input.bed' '$remap_chain' /dev/stdout /dev/null 2> /dev/null`;
     unlink( "$tmp_dir/input.bed" );
 
     # Create a new VCF in the temp folder, with remapped loci
@@ -219,7 +219,7 @@ while( my $line = $vcf_in_fh->getline ) {
         $nrm_info{DP} = $nrm_info{AD} = $nrm_info{ADF} = $nrm_info{ADR} = ".";
 
         # Generate mpileup and parse out only DP,AD,ADF,ADR for tumor/normal samples
-        my @p_lines = `samtools mpileup --region $chrom:$pos-$pos --count-orphans --no-BAQ --min-MQ 1 --min-BQ 5 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --VCF --uncompressed --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --fasta-ref $ref_fasta $tumor_bam $normal_bam 2> /dev/null`;
+        my @p_lines = `'$samtools' mpileup --region $chrom:$pos-$pos --count-orphans --no-BAQ --min-MQ 1 --min-BQ 5 --ignore-RG --excl-flags UNMAP,SECONDARY,QCFAIL,DUP --VCF --uncompressed --output-tags DP,AD,ADF,ADR --ext-prob 20 --gap-frac 0.002 --tandem-qual 80 --min-ireads 1 --open-prob 30 --fasta-ref '$ref_fasta' '$tumor_bam' '$normal_bam' 2> /dev/null`;
 
         my ( $p_vcf_tumor_idx, $p_vcf_normal_idx ) = ( 0, 1 );
         foreach my $p_line ( @p_lines ) {

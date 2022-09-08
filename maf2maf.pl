@@ -102,8 +102,8 @@ else {
 }
 
 # Construct a maf2vcf command and run it
-my $maf2vcf_cmd = "$perl_bin $maf2vcf_path --input-maf $input_maf --output-dir $tmp_dir " .
-    "--ref-fasta $ref_fasta --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
+my $maf2vcf_cmd = "$perl_bin '$maf2vcf_path' --input-maf '$input_maf' --output-dir '$tmp_dir' " .
+    "--ref-fasta '$ref_fasta' --tum-depth-col $tum_depth_col --tum-rad-col $tum_rad_col " .
     "--tum-vad-col $tum_vad_col --nrm-depth-col $nrm_depth_col --nrm-rad-col $nrm_rad_col ".
     "--nrm-vad-col $nrm_vad_col --per-tn-vcfs";
 system( $maf2vcf_cmd ) == 0 or die "\nERROR: Failed to run maf2vcf! Command: $maf2vcf_cmd\n";
@@ -124,7 +124,7 @@ else {
     ( -s $vep_script ) or die "ERROR: Cannot find VEP script in path: $vep_path\n";
 
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build --offline --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir $vep_data --fasta $ref_fasta --format vcf --input_file $vcf_file --output_file $vep_anno";
+    my $vep_cmd = "$perl_bin '$vep_script' --species $species --assembly $ncbi_build --offline --no_progress --no_stats --buffer_size $buffer_size --sift b --ccds --uniprot --hgvs --symbol --numbers --domains --gene_phenotype --canonical --protein --biotype --uniprot --tsl --pubmed --variant_class --shift_hgvs 1 --check_existing --total_length --allele_number --no_escape --xref_refseq --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length --dir '$vep_data' --fasta '$ref_fasta' --format vcf --input_file '$vcf_file' --output_file '$vep_anno'";
     # VEP barks if --fork is set to 1. So don't use this argument unless it's >1
     $vep_cmd .= " --fork $vep_forks" if( $vep_forks > 1 );
     # Require allele match for co-located variants unless user-rejected or we're using a newer VEP
@@ -148,7 +148,7 @@ else {
 my $tsv_file = $tmp_basename . ".pairs.tsv";
 
 # Store the VEP annotated VCF header so we can duplicate it for per-TN VCFs
-my $vep_vcf_header = `grep ^## $vep_anno`;
+my $vep_vcf_header = `grep ^## '$vep_anno'`;
 
 # Split the multi-sample VEP annotated VCF into per-TN VCFs
 my ( %tn_pair, %t_col_idx, %n_col_idx, %tn_vep );
@@ -163,7 +163,7 @@ while( my $line = $vep_fh->getline ) {
     if( $line =~ m/^#CHROM/ ) {
 
         # Initialize VCF header and fill up %tn_pair for each tumor-normal pair
-        foreach ( `grep -Ev ^# $tsv_file` ){
+        foreach ( `grep -Ev ^# '$tsv_file'` ){
             chomp;
             my @ids = split( "\t", $_ );
             $t_col_idx{ $ids[ 0 ] } = 1;
@@ -224,16 +224,16 @@ foreach my $tn_vcf ( @vcfs ) {
     my ( $tumor_id, $normal_id ) = $tn_vcf=~m/^.*\/(.*)_vs_(.*)\.vep.vcf/;
     my $tn_maf = $tn_vcf;
     $tn_maf =~ s/.vep.vcf$/.vep.maf/;
-    my $vcf2maf_cmd = "$perl_bin $vcf2maf_path --input-vcf $tn_vcf --output-maf $tn_maf --inhibit-vep" .
-        " --tumor-id $tumor_id --normal-id $normal_id --vep-path $vep_path --vep-data $vep_data" .
-        " --ref-fasta $ref_fasta --ncbi-build $ncbi_build --species $species --max-subpop-af $max_subpop_af";
-    $vcf2maf_cmd .= " --custom-enst $custom_enst_file" if( $custom_enst_file );
+    my $vcf2maf_cmd = "$perl_bin '$vcf2maf_path' --input-vcf '$tn_vcf' --output-maf '$tn_maf' --inhibit-vep" .
+        " --tumor-id $tumor_id --normal-id $normal_id --vep-path '$vep_path' --vep-data '$vep_data' " .
+        " --ref-fasta '$ref_fasta' --ncbi-build $ncbi_build --species $species --max-subpop-af $max_subpop_af";
+    $vcf2maf_cmd .= " --custom-enst '$custom_enst_file'" if( $custom_enst_file );
     system( $vcf2maf_cmd ) == 0 or die "\nERROR: Failed to run vcf2maf! Command: $vcf2maf_cmd\n";
 }
 
 # Fetch the column header from one of the resulting MAFs
 my @mafs = glob( "$tmp_dir/*.vep.maf" );
-my $maf_header = `grep ^Hugo_Symbol $mafs[0] | head -n1`;
+my $maf_header = `grep ^Hugo_Symbol '$mafs[0]' | head -n1`;
 chomp( $maf_header );
 
 # If user wants to retain some columns from the input MAF, fetch those and override
@@ -344,7 +344,7 @@ if( $output_maf ) {
 }
 $maf_fh->print( "#version 2.4\n$maf_header\n" );
 foreach my $tn_maf ( @mafs ) {
-    my @maf_lines = `grep -Ev "^#|^Hugo_Symbol" $tn_maf`;
+    my @maf_lines = `grep -Ev "^#|^Hugo_Symbol" '$tn_maf'`;
     $maf_fh->print( @maf_lines );
 }
 $maf_fh->close;

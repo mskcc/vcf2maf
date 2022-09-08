@@ -78,7 +78,7 @@ while( my $line = $maf_fh->getline ) {
         # Fetch all tumor-normal paired IDs from the MAF, doing some whitespace cleanup in the same step
         my $tn_idx = $col_idx{tumor_sample_barcode} + 1;
         $tn_idx .= ( "," . ( $col_idx{matched_norm_sample_barcode} + 1 )) if( defined $col_idx{matched_norm_sample_barcode} );
-        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`grep -aEiv "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" $input_maf | cut -f $tn_idx | sort -u`;
+        @tn_pair = map{s/^\s+|\s+$|\r|\n//g; s/\s*\t\s*/\t/; $_}`grep -aEiv "^#|^Hugo_Symbol|^Chromosome|^Tumor_Sample_Barcode" '$input_maf' | cut -f $tn_idx | sort -u`;
 
         # Quit if one of the TN barcodes are missing, or they contain characters not allowed in Unix filenames
         map{ ( !m/^\s*$|^#|\0|\// ) or die "ERROR: Invalid Tumor_Sample_Barcode in MAF: \"$_\"\n"} @tn_pair;
@@ -103,7 +103,7 @@ $maf_fh->close;
 my ( @regions_split, $lines );
 my @regions = keys %uniq_regions;
 push( @regions_split, [ splice( @regions, 0, 5000 ) ] ) while @regions;
-map{ my $loci = join( " ", @{$_} ); $lines .= `$samtools faidx $ref_fasta $loci` } @regions_split;
+map{ my $loci = join( " ", @{$_} ); $lines .= `'$samtools' faidx '$ref_fasta' $loci` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
     my ( $locus, $bps ) = split( "\n", $line, 2 );
@@ -119,8 +119,8 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 
 # Create VCF header lines for the reference FASTA, its contigs, and their lengths
 my $ref_fai = $ref_fasta . ".fai";
-`$samtools faidx $ref_fasta` unless( -s $ref_fai );
-my @ref_contigs = map { chomp; my ($chr, $len)=split("\t"); "##contig=<ID=$chr,length=$len>\n" } `cut -f1,2 $ref_fai | sort -k1,1V`;
+`'$samtools' faidx '$ref_fasta'` unless( -s $ref_fai );
+my @ref_contigs = map { chomp; my ($chr, $len)=split("\t"); "##contig=<ID=$chr,length=$len>\n" } `cut -f1,2 '$ref_fai' | sort -k1,1V`;
 my $ref_header = "##reference=file://$ref_fasta\n" . join( "", @ref_contigs );
 
 # Parse through each variant in the MAF, and fill up the respective per-sample VCFs
