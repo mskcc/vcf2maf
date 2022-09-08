@@ -280,7 +280,7 @@ my %custom_enst;
 if( $custom_enst_file ) {
     ( -s $custom_enst_file ) or die "ERROR: Provided --custom-enst file is missing or empty: $custom_enst_file\n";
     warn "STATUS: Reading --custom-enst $custom_enst_file...\n" if( $verbose );
-    %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# $custom_enst_file | cut -f1`;
+    %custom_enst = map{chomp; ( $_, 1 )}`grep -v ^# '$custom_enst_file' | cut -f1`;
 }
 
 # Create a folder for the intermediate VCFs if user-defined, or default to the input VCF's folder
@@ -332,7 +332,7 @@ while( my $line = $orig_vcf_fh->getline ) {
             $cols[7]=~s/SVMETHOD=([\w.]+)/Method=$1/;
             $cols[4] = "<" . $info{SVTYPE} . ">";
             # Fetch the REF allele at the second breakpoint using samtools faidx
-            my $ref2 = `$samtools faidx $ref_fasta $info{CHR2}:$info{END}-$info{END} | grep -v ^\\>`;
+            my $ref2 = `'$samtools' faidx '$ref_fasta' $info{CHR2}:$info{END}-$info{END} | grep -v ^\\>`;
             chomp( $ref2 );
             $split_vcf_fh->print( join( "\t", $info{CHR2}, $info{END}, $cols[2], ( $ref2 ? $ref2 : $cols[3] ), @cols[4..$#cols] ), "\n" );
             $split_vcf_fh->print( join( "\t", @cols ), "\n" );
@@ -360,8 +360,8 @@ if( $remap_chain ) {
     warn "STATUS: Running liftOver...\n" if( $verbose );
 
     # Make a BED file from the VCF, run liftOver on it, and create a hash mapping old to new loci
-    `grep -v ^# $input_vcf | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > $tmp_dir/$input_name.bed`;
-    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`$liftover $tmp_dir/$input_name.bed $remap_chain /dev/stdout /dev/null 2> /dev/null`;
+    `grep -v ^# '$input_vcf' | cut -f1,2 | awk '{OFS="\\t"; print \$1,\$2-1,\$2,\$1":"\$2}' > '$tmp_dir/$input_name.bed'`;
+    %remap = map{chomp; my @c=split("\t"); ($c[3], "$c[0]:$c[2]")}`'$liftover' '$tmp_dir/$input_name.bed' '$remap_chain' /dev/stdout /dev/null 2> /dev/null`;
     unlink( "$tmp_dir/$input_name.bed" );
 
     # Create a new VCF in the temp folder, with remapped loci on which we'll run annotation
@@ -415,7 +415,7 @@ my ( $lines, @regions_split ) = ( "", ());
 my @regions = keys %uniq_regions;
 my $chr_prefix_in_use = ( @regions and $regions[0] =~ m/^chr/ ? 1 : 0 );
 push( @regions_split, [ splice( @regions, 0, $buffer_size ) ] ) while @regions;
-map{ my $region = join( " ", sort @{$_} ); $lines .= `$samtools faidx $ref_fasta $region` } @regions_split;
+map{ my $region = join( " ", sort @{$_} ); $lines .= `'$samtools' faidx '$ref_fasta' $region` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
     my ( $region, $bps ) = split( "\n", $line, 2 );
@@ -459,7 +459,7 @@ unless( $inhibit_vep ) {
     ( -s $vep_script ) or die "ERROR: Cannot find VEP script under: $vep_path\n";
 
     # Contruct VEP command using some default options and run it
-    my $vep_cmd = "$perl_bin $vep_script --species $species --assembly $ncbi_build";
+    my $vep_cmd = "$perl_bin '$vep_script' --species $species --assembly $ncbi_build";
     $vep_cmd .= " --no_progress" unless( $verbose );
     $vep_cmd .= " --no_stats" unless( $vep_stats );
     $vep_cmd .= " --buffer_size $buffer_size --sift b --ccds";
@@ -467,7 +467,7 @@ unless( $inhibit_vep ) {
     $vep_cmd .= " --protein --biotype --uniprot --tsl --variant_class --shift_hgvs 1";
     $vep_cmd .= " --check_existing --total_length --allele_number --no_escape --xref_refseq";
     $vep_cmd .= " --failed 1 --vcf --flag_pick_allele --pick_order canonical,tsl,biotype,rank,ccds,length";
-    $vep_cmd .= " --dir $vep_data --fasta $ref_fasta --format vcf --input_file $input_vcf --output_file $output_vcf";
+    $vep_cmd .= " --dir '$vep_data' --fasta '$ref_fasta' --format vcf --input_file '$input_vcf' --output_file '$output_vcf'";
     $vep_cmd .= " --force_overwrite" if( $vep_overwrite );
     # Change options based on whether we are running in offline mode or not
     $vep_cmd .= ( $online ? " --database --host useastdb.ensembl.org" : " --offline --pubmed" );
@@ -563,7 +563,7 @@ $script_dir = "." unless( $script_dir );
 my $entrez_id_file = "$script_dir/data/ensg_to_entrez_id_map_ensembl_feb2014.tsv";
 my %entrez_id_map = ();
 if( -s $entrez_id_file ) {
-    %entrez_id_map = map{chomp; split("\t")} `grep -hv ^# $entrez_id_file`;
+    %entrez_id_map = map{chomp; split("\t")} `grep -hv ^# '$entrez_id_file'`;
 }
 
 # Parse through each variant in the annotated VCF, pull out CSQ/ANN from the INFO column, and choose
