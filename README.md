@@ -1,21 +1,19 @@
 vcf<img src="https://i.giphy.com/R6X7GehJWQYms.gif" width="28">maf
 =======
 
-To convert a [VCF](http://samtools.github.io/hts-specs/) into a [MAF](https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. But even within a single isoform, a `Missense_Mutation` close enough to a `Splice_Site`, can be labeled as either in MAF format, but not as both. **This selection of a single effect per variant, is often subjective. And that's what this project attempts to standardize.** The `vcf2maf` and `maf2maf` scripts leave most of that responsibility to [Ensembl's VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html), but allows you to override their "canonical" isoforms, or use a custom ExAC VCF for annotation. Though the most useful feature is the **extensive support in parsing a wide range of crappy MAF-like or VCF-like formats** we've seen out in the wild.
-
-[![Build Status](https://travis-ci.com/mskcc/vcf2maf.svg?branch=master)](https://travis-ci.com/mskcc/vcf2maf)
+To convert a [VCF](https://samtools.github.io/hts-specs//) into a [MAF](https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. But even within a single isoform, a `Missense_Mutation` close enough to a `Splice_Site`, can be labeled as either in MAF format, but not as both. **This selection of a single effect per variant, is often subjective. And that's what this project attempts to standardize.** The `vcf2maf` and `maf2maf` scripts leave most of that responsibility to [Ensembl's VEP](http://ensembl.org/info/docs/tools/vep/index.html), but allows you to override their "canonical" isoforms, or use a custom ExAC VCF for annotation. Though the most useful feature is the **extensive support in parsing a wide range of crappy MAF-like or VCF-like formats** we've seen out in the wild.
 
 Quick start
 -----------
 
-Find the [latest stable release](https://github.com/mskcc/vcf2maf/releases), download it, and view the detailed usage manuals for `vcf2maf` and `maf2maf`:
+Find the [latest release](https://github.com/mskcc/vcf2maf/releases), download it, and view the detailed usage manuals for `vcf2maf` and `maf2maf`:
 
     export VCF2MAF_URL=`curl -sL https://api.github.com/repos/mskcc/vcf2maf/releases | grep -m1 tarball_url | cut -d\" -f4`
     curl -L -o mskcc-vcf2maf.tar.gz $VCF2MAF_URL; tar -zxf mskcc-vcf2maf.tar.gz; cd mskcc-vcf2maf-*
     perl vcf2maf.pl --man
     perl maf2maf.pl --man
 
-If you don't have [VEP](http://useast.ensembl.org/info/docs/tools/vep/index.html) installed, then [follow this gist](https://gist.github.com/ckandoth/61c65ba96b011f286220fa4832ad2bc0). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, test out `vcf2maf` like this:
+If you don't have VEP installed, then [follow this gist](https://gist.github.com/ckandoth/4bccadcacd58aad055ed369a78bf2e7c). Of the many annotators out there, VEP is preferred for its large team of active coders, and its CLIA-compliant [HGVS formats](http://www.hgvs.org/mutnomen/recs.html). After installing VEP, test out `vcf2maf` like this:
 
     perl vcf2maf.pl --input-vcf tests/test.vcf --output-maf tests/test.vep.maf
 
@@ -49,6 +47,37 @@ After tests on variant lists from many sources, `maf2vcf` and `maf2maf` are quit
 
 See `data/minimalist_test_maf.tsv` for a sampler. Addition of `Tumor_Seq_Allele1` will be used to determine zygosity. Otherwise, it will try to determine zygosity from variant allele fractions, assuming that arguments `--tum-vad-col` and `--tum-depth-col` are set correctly to the names of columns containing those read counts. Specifying the `Matched_Norm_Sample_Barcode` with its respective columns containing read-counts, is also strongly recommended. Columns containing normal allele read counts can be specified using argument `--nrm-vad-col` and `--nrm-depth-col`.
 
+Docker
+------
+
+Assuming you have a recent version of docker, clone the main branch and build an image as follows:
+
+    git clone git@github.com:mskcc/vcf2maf.git
+    cd vcf2maf
+    docker build -t vcf2maf:main .
+    docker builder prune -f
+
+Now you run the scripts in docker as follows:
+
+    docker run --rm vcf2maf:main perl vcf2maf.pl --help
+    docker run --rm vcf2maf:main perl maf2maf.pl --help
+
+Testing
+-------
+
+A small standalone test dataset was created by restricting VEP v112 cache/fasta to chr21 in GRCh38 and hosting that on a private server for download by CI services. We can manually fetch those as follows:
+
+    wget -P tests https://data.cyri.ac/Homo_sapiens.GRCh38.dna.chromosome.21.fa.gz
+    gzip -d tests/Homo_sapiens.GRCh38.dna.chromosome.21.fa.gz
+    wget -P tests https://data.cyri.ac/homo_sapiens_vep_112_GRCh38_chr21.tar.gz
+    tar -zxf tests/homo_sapiens_vep_112_GRCh38_chr21.tar.gz -C tests
+
+And the following scripts test the docker image on predefined inputs and compare outputs against expected outputs:
+
+    perl tests/vcf2maf.t
+    perl tests/vcf2vcf.t
+    perl tests/maf2vcf.t
+
 License
 -------
 
@@ -57,4 +86,4 @@ License
 Citation
 --------
 
-    Cyriac Kandoth. mskcc/vcf2maf: vcf2maf v1.6.19. (2020). doi:10.5281/zenodo.593251
+    Cyriac Kandoth. mskcc/vcf2maf: vcf2maf v1.6. (2020). doi:10.5281/zenodo.593251

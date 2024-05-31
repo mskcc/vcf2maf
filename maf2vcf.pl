@@ -9,7 +9,7 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage qw( pod2usage );
 
 # Set any default paths and constants
-my $ref_fasta = "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz";
+my $ref_fasta = "$ENV{HOME}/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz";
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 
@@ -357,7 +357,7 @@ __DATA__
  --input-maf      Path to input file in MAF format
  --output-dir     Path to output directory where VCFs will be stored, one per TN-pair
  --output-vcf     Path to output multi-sample VCF containing all TN-pairs [<output-dir>/<input-maf-name>.vcf]
- --ref-fasta      Path to reference Fasta file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+ --ref-fasta      Path to reference Fasta file [~/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
  --per-tn-vcfs    Specify this to generate VCFs per-TN pair, in addition to the multi-sample VCF
  --tum-depth-col  Name of MAF column for read depth in tumor BAM [t_depth]
  --tum-rad-col    Name of MAF column for reference allele depth in tumor BAM [t_ref_count]
@@ -376,12 +376,11 @@ This script breaks down variants in a MAF into a multi-sample VCF, in preparatio
 
  Homepage: https://github.com/ckandoth/vcf2maf
  VCF format: http://samtools.github.io/hts-specs/
- MAF format: https://wiki.nci.nih.gov/x/eJaPAQ
+ MAF format: https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format
 
 =head1 AUTHORS
 
  Cyriac Kandoth (ckandoth@gmail.com)
- Qingguo Wang (josephw10000@gmail.com)
 
 =head1 LICENSE
 

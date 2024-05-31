@@ -16,7 +16,7 @@ use Config;
 my ( $tum_depth_col, $tum_rad_col, $tum_vad_col ) = qw( t_depth t_ref_count t_alt_count );
 my ( $nrm_depth_col, $nrm_rad_col, $nrm_vad_col ) = qw( n_depth n_ref_count n_alt_count );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0 );
-my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
+my ( $ref_fasta, $filter_vcf ) = ( "$ENV{HOME}/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz", "" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", 0.0004 );
 my $perl_bin = $Config{perlpath};
 
@@ -41,8 +41,9 @@ my %force_new_cols = map{ my $c = lc; ( $c, 1 )} qw( Hugo_Symbol Entrez_Gene_Id 
     MINIMISED ExAC_AF ExAC_AF_AFR ExAC_AF_AMR ExAC_AF_EAS ExAC_AF_FIN ExAC_AF_NFE ExAC_AF_OTH
     ExAC_AF_SAS GENE_PHENO FILTER flanking_bps variant_id variant_qual ExAC_AF_Adj ExAC_AC_AN_Adj
     ExAC_AC_AN ExAC_AC_AN_AFR ExAC_AC_AN_AMR ExAC_AC_AN_EAS ExAC_AC_AN_FIN ExAC_AC_AN_NFE
-    ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER gnomAD_AF gnomAD_AFR_AF gnomAD_AMR_AF gnomAD_ASJ_AF
-    gnomAD_EAS_AF gnomAD_FIN_AF gnomAD_NFE_AF gnomAD_OTH_AF gnomAD_SAS_AF );
+    ExAC_AC_AN_OTH ExAC_AC_AN_SAS ExAC_FILTER gnomADe_AF gnomADe_AFR_AF gnomADe_AMR_AF
+    gnomADe_ASJ_AF gnomADe_EAS_AF gnomADe_FIN_AF gnomADe_NFE_AF gnomADe_OTH_AF gnomADe_SAS_AF
+);
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -382,7 +383,7 @@ __DATA__
  --species        Ensembl-friendly name of species (e.g. mus_musculus for mouse) [homo_sapiens]
  --ncbi-build     NCBI reference assembly of variants in MAF (e.g. GRCm38 for mouse) [GRCh37]
  --cache-version  Version of offline cache to use with VEP (e.g. 75, 84, 91) [Default: Installed version]
- --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+ --ref-fasta      Reference FASTA file [~/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
  --help           Print a brief help message and quit
  --man            Print the detailed manual
 
@@ -401,7 +402,6 @@ This script runs a given MAF through maf2vcf to generate per-TN-pair VCFs in a t
 =head1 AUTHORS
 
  Cyriac Kandoth (ckandoth@gmail.com)
- Qingguo Wang (josephw10000@gmail.com)
 
 =head1 LICENSE
 

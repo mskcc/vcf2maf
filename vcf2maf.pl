@@ -15,7 +15,7 @@ use Text::Wrap;
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
 my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 , 0);
-my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
+my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 0.0004 );
 my $perl_bin = $Config{perlpath};
 
@@ -143,6 +143,7 @@ sub GetBiotypePriority {
         'regulatory_region' => 6, # A region of sequence that is involved in the control of a biological process
         'disrupted_domain' => 6, # Otherwise viable coding region omitted from this alternatively spliced transcript because the splice variation affects a region coding for a protein domain
         'processed_transcript' => 6, # Doesn't contain an ORF
+        'protein_coding_CDS_not_defined' => 6, # Transcript that belongs to a protein_coding gene and doesn't contain an ORF. Replaces the processed_transcript transcript biotype in protein_coding genes
         'TEC' => 6, # To be Experimentally Confirmed. This is used for non-spliced EST clusters that have polyA features. This category has been specifically created for the ENCODE project to highlight regions that could indicate the presence of protein coding genes that require experimental validation, either by 5' RACE or RT-PCR to extend the transcripts, or by confirming expression of the putatively-encoded peptide with specific antibodies
         'TF_binding_site' => 7, # A region of a nucleotide molecule that binds a Transcription Factor or Transcription Factor complex
         'CTCF_binding_site' =>7, # A transcription factor binding site with consensus sequence CCGCGNGGNGGCAG, bound by CCCTF-binding factor
@@ -517,8 +518,9 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
     SYMBOL_SOURCE HGNC_ID BIOTYPE CANONICAL CCDS ENSP SWISSPROT TREMBL UNIPARC RefSeq SIFT PolyPhen
     EXON INTRON DOMAINS AF AFR_AF AMR_AF ASN_AF EAS_AF EUR_AF SAS_AF AA_AF EA_AF CLIN_SIG SOMATIC
     PUBMED MOTIF_NAME MOTIF_POS HIGH_INF_POS MOTIF_SCORE_CHANGE IMPACT PICK VARIANT_CLASS TSL
-    HGVS_OFFSET PHENO MINIMISED GENE_PHENO FILTER flanking_bps vcf_id vcf_qual gnomAD_AF gnomAD_AFR_AF
-    gnomAD_AMR_AF gnomAD_ASJ_AF gnomAD_EAS_AF gnomAD_FIN_AF gnomAD_NFE_AF gnomAD_OTH_AF gnomAD_SAS_AF );
+    HGVS_OFFSET PHENO MINIMISED GENE_PHENO FILTER flanking_bps vcf_id vcf_qual gnomADe_AF gnomADe_AFR_AF
+    gnomADe_AMR_AF gnomADe_ASJ_AF gnomADe_EAS_AF gnomADe_FIN_AF gnomADe_NFE_AF gnomADe_OTH_AF gnomADe_SAS_AF
+);
 
 # push any requested custom VEP annotations from the CSQ/ANN section into @ann_cols
 if ($retain_ann) {
@@ -888,8 +890,8 @@ while( my $line = $annotated_vcf_fh->getline ) {
     # Copy FILTER from input VCF, and tag calls with high allele freq in any gnomAD subpopulation
     my $subpop_count = 0;
     foreach my $subpop ( qw( AFR AMR ASJ EAS FIN NFE SAS )) {
-        if( $maf_line{"gnomAD_$subpop\_AF"} ) {
-            my ( $subpop_af ) = split( "/", $maf_line{"gnomAD_$subpop\_AF"} );
+        if( $maf_line{"gnomADe_$subpop\_AF"} ) {
+            my ( $subpop_af ) = split( "/", $maf_line{"gnomADe_$subpop\_AF"} );
             $subpop_count++ if( $subpop_af > $max_subpop_af );
         }
     }
@@ -1200,7 +1202,7 @@ Use useastdb.ensembl.org instead of local cache (supports only GRCh38 VCFs listi
 
 =item B<--ref-fasta>=I<FASTA>
 
-Reference FASTA file [~/.vep/homo_sapiens/102_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
+Reference FASTA file [~/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz]
 
 =item B<--species>=I<SPECIES>
 
@@ -1212,7 +1214,7 @@ NCBI reference assembly of variants MAF (e.g. GRCm38 for mouse) [GRCh37]
 
 =item B<--cache-version>=I<N>
 
-Version of offline cache to use with VEP (e.g. 75, 91, 102) [Default: Installed version]
+Version of offline cache to use with VEP (e.g. 75, 91, 112) [Default: Installed version]
 
 =item B<--remap-chain>=I<REMAP_CHAIN>
 
@@ -1402,8 +1404,6 @@ L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
 =head1 AUTHORS
 
  Cyriac Kandoth (ckandoth@gmail.com)
- Shweta Chavan (chavan.shweta@gmail.com)
- Zuojian Tang (zuojian.tang@gmail.com)
 
 =head1 LICENSE
 
