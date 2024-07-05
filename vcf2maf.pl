@@ -1348,7 +1348,7 @@ with B<--retain-ann> to ensure they are included in the output MAF.
 
 =over 8
 
---vep-plugin AlphaMissense,file=/path/to/AlphaMissense_{build}.tsv.gz 
+--vep-plugins AlphaMissense,file=/path/to/AlphaMissense_{build}.tsv.gz 
 
 --retain-ann am_pathogenicity,am_class
 
