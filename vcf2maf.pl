@@ -14,7 +14,7 @@ use Text::Wrap;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 , 0);
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_plugins, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", "", 0 , 0);
 my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 0.0004 );
 my $perl_bin = $Config{perlpath};
@@ -217,6 +217,7 @@ GetOptions(
     'vep-forks=s' => \$vep_forks,
     'vep-custom=s' => \$vep_custom,
     'vep-config=s' => \$vep_config,
+    'vep-plugins=s' => \$vep_plugins,
     'vep-overwrite!' => \$vep_overwrite,
     'vep-stats' => \$vep_stats,
     'buffer-size=i' => \$buffer_size,
@@ -478,6 +479,8 @@ unless( $inhibit_vep ) {
     $vep_cmd .= " --custom $vep_custom" if ($vep_custom);
     # Add --config if requested at command line
     $vep_cmd .= " --config $vep_config" if ($vep_config);
+    # Add --plugin if requested at command line
+    $vep_cmd .= " --plugin $vep_plugins" if ($vep_plugins);
     # Require allele match for co-located variants unless user-rejected or we're using a newer VEP
     $vep_cmd .= " --check_allele" unless( $any_allele or $vep_script =~ m/vep$/ );
     # Add --cache-version only if the user specifically asked for a version
@@ -526,6 +529,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
 if ($retain_ann) {
     push @ann_cols, split(',',$retain_ann);
 }
+
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -1279,6 +1283,10 @@ String to pass into VEP's --custom option [] (see L<CUSTOMIZED VEP ANNOTATION> b
 
 VEP config file to pass into vep's --config option [] (see L<CUSTOMIZED VEP ANNOTATION> below)
 
+=item B<--vep-plugins>=I<VEP_PLUGIN_STRING>
+
+A string of plugin instructions to pass into vep's --plugin option [] (see L<VEP PLUGINS> below)
+
 =back
 
 =head3 CUSTOMIZED VEP ANNOTATION
@@ -1291,7 +1299,7 @@ L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
 
 The custom VEP output is saved in the B<INFO> section of the VCF line, as part of the B<CSQ=> section.
 
-To retain the customized output in the MAF file, in addition to specifing the custom annoation
+To retain the customized output in the MAF file, in addition to specifing the custom annotation
 and fields with B<--vep-custom> , we need to specify the fields to retain with B<--retain-ann>.
 
 VEP's B<--custom>=I<STRING> is a comma-separated string:
@@ -1313,6 +1321,40 @@ For example, below we have Short_name of I<MY_Ann> and VCF_fields of I<AD,TOPMED
 --retain-ann I<MY_Ann>B<_>I<AD>,I<MY_Ann>B<_>I<TOPMED>
 
 =back
+
+=back
+
+=head3 VEP PLUGINS
+
+=over 2
+
+**NOTE**: This currently has only been tested with the AlphaMissense plugin. 
+Other plugins, particularly custom plugins, may not be compatible.
+
+VEP's plugins are described at: 
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_plugins.html>
+
+To use a VEP plugin, we need to specify the plugin name and options with B<--vep-plugins>.
+
+For example, to use the VEP AlphaMissense plugin:
+
+L<https://github.com/Ensembl/VEP_plugins/blob/main/AlphaMissense.pm>
+
+After retrieving and tabix indexing the AlphaMissense database as described in the plugin README, 
+we can include these parameters and values in the vcf2maf command. Please note, you'll need to 
+specify the names of the annotations from the plugin that you would like to retain 
+with B<--retain-ann> to ensure they are included in the output MAF. 
+
+=over 8
+
+--vep-plugin AlphaMissense,file=/path/to/AlphaMissense_{build}.tsv.gz 
+
+--retain-ann am_pathogenicity,am_class
+
+=back
+
+The output maf should now have the annotations am_pathogenicity and am_class included as columns.
 
 =back
 
@@ -1398,6 +1440,10 @@ L<https://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout>
 =item VEP customized output:
 
 L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
+
+=item VEP plugins:
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_plugins.html>
 
 =back
 
