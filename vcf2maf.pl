@@ -1285,7 +1285,7 @@ VEP config file to pass into vep's --config option [] (see L<CUSTOMIZED VEP ANNO
 
 =item B<--vep-plugins>=I<VEP_PLUGIN_STRING>
 
-VEP plugin instructions to pass into vep's --plugin option []
+A string of plugin instructions to pass into vep's --plugin option [] (see L<VEP PLUGINS> below)
 
 =back
 
@@ -1299,7 +1299,7 @@ L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
 
 The custom VEP output is saved in the B<INFO> section of the VCF line, as part of the B<CSQ=> section.
 
-To retain the customized output in the MAF file, in addition to specifing the custom annoation
+To retain the customized output in the MAF file, in addition to specifing the custom annotation
 and fields with B<--vep-custom> , we need to specify the fields to retain with B<--retain-ann>.
 
 VEP's B<--custom>=I<STRING> is a comma-separated string:
@@ -1321,6 +1321,40 @@ For example, below we have Short_name of I<MY_Ann> and VCF_fields of I<AD,TOPMED
 --retain-ann I<MY_Ann>B<_>I<AD>,I<MY_Ann>B<_>I<TOPMED>
 
 =back
+
+=back
+
+=head3 VEP PLUGINS
+
+=over 2
+
+**NOTE**: This currently has only been tested with the AlphaMissense plugin. 
+Other plugins, particularly custom plugins, may not be compatible.
+
+VEP's plugins are described at: 
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_plugins.html>
+
+To use a VEP plugin, we need to specify the plugin name and options with B<--vep-plugins>.
+
+For example, to use the VEP AlphaMissense plugin:
+
+L<https://github.com/Ensembl/VEP_plugins/blob/main/AlphaMissense.pm>
+
+After retrieving and tabix indexing the AlphaMissense database as described in the plugin README, 
+we can include these parameters and values in the vcf2maf command. Please note, you'll need to 
+specify the names of the annotations from the plugin that you would like to retain 
+with B<--retain-ann> to ensure they are included in the output MAF. 
+
+=over 8
+
+--vep-plugin AlphaMissense,file=/path/to/AlphaMissense_{build}.tsv.gz 
+
+--retain-ann am_pathogenicity,am_class
+
+=back
+
+The output maf should now have the annotations am_pathogenicity and am_class included as columns.
 
 =back
 
