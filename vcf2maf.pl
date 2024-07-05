@@ -14,7 +14,7 @@ use Text::Wrap;
 
 # Set any default paths and constants
 my ( $tumor_id, $normal_id ) = ( "TUMOR", "NORMAL" );
-my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", 0 , 0);
+my ( $vep_path, $vep_data, $vep_forks, $buffer_size, $any_allele, $inhibit_vep, $online, $vep_custom, $vep_config, $vep_plugins, $vep_overwrite, $vep_stats  ) = ( "$ENV{HOME}/miniconda3/bin", "$ENV{HOME}/.vep", 4, 5000, 0, 0, 0, "", "", "", 0 , 0);
 my ( $ref_fasta ) = ( "$ENV{HOME}/.vep/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz" );
 my ( $species, $ncbi_build, $cache_version, $maf_center, $retain_info, $retain_fmt, $retain_ann, $min_hom_vaf, $max_subpop_af ) = ( "homo_sapiens", "GRCh37", "", ".", "", "", "", 0.7, 0.0004 );
 my $perl_bin = $Config{perlpath};
@@ -217,6 +217,7 @@ GetOptions(
     'vep-forks=s' => \$vep_forks,
     'vep-custom=s' => \$vep_custom,
     'vep-config=s' => \$vep_config,
+    'vep-plugins=s' => \$vep_plugins,
     'vep-overwrite!' => \$vep_overwrite,
     'vep-stats' => \$vep_stats,
     'buffer-size=i' => \$buffer_size,
@@ -478,6 +479,8 @@ unless( $inhibit_vep ) {
     $vep_cmd .= " --custom $vep_custom" if ($vep_custom);
     # Add --config if requested at command line
     $vep_cmd .= " --config $vep_config" if ($vep_config);
+    # Add --plugin if requested at command line
+    $vep_cmd .= " --plugin $vep_plugins" if ($vep_plugins);
     # Require allele match for co-located variants unless user-rejected or we're using a newer VEP
     $vep_cmd .= " --check_allele" unless( $any_allele or $vep_script =~ m/vep$/ );
     # Add --cache-version only if the user specifically asked for a version
@@ -526,6 +529,7 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
 if ($retain_ann) {
     push @ann_cols, split(',',$retain_ann);
 }
+
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
 push( @maf_header, @ann_cols );
 
@@ -1279,6 +1283,10 @@ String to pass into VEP's --custom option [] (see L<CUSTOMIZED VEP ANNOTATION> b
 
 VEP config file to pass into vep's --config option [] (see L<CUSTOMIZED VEP ANNOTATION> below)
 
+=item B<--vep-plugins>=I<VEP_PLUGIN_STRING>
+
+VEP plugin instructions to pass into vep's --plugin option []
+
 =back
 
 =head3 CUSTOMIZED VEP ANNOTATION
@@ -1398,6 +1406,10 @@ L<https://ensembl.org/info/docs/tools/vep/vep_formats.html#vcfout>
 =item VEP customized output:
 
 L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_custom.html>
+
+=item VEP plugins:
+
+L<https://useast.ensembl.org/info/docs/tools/vep/script/vep_plugins.html>
 
 =back
 
