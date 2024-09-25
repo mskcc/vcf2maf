@@ -35,11 +35,25 @@ sub GetEffectPriority {
     my %effectPriority = (
         'transcript_ablation' => 1, # A feature ablation whereby the deleted region includes a transcript feature
         'exon_loss_variant' => 1, # A sequence variant whereby an exon is lost from the transcript
+        'sequence_feature + exon_loss_variant' =>1, # A 'NextProt' based annotation. Details are provided in the 'feature type' sub-field (ANN), or in the effect details (EFF).
+        'feature_ablation' =>1, # Deletion of a gene.
+        'chromosome_number_variation' =>1, # A kind of chromosome variation where the chromosome complement is not an exact multiple of the haploid number.
+        'bidirectional_gene_fusion' =>2, # Fusion of two genes in opposite directions.
+        'duplication' =>2, # Duplication affecting part of an exon.
+        'gene_fusion' =>2, # Fusion of two genes.
+        'gene_fusion' =>2, # Fusion of one gene and an intergenic region.
+        'inversion' =>2, # Inversion of an exon.
         'splice_donor_variant' => 2, # A splice variant that changes the 2 base region at the 5' end of an intron
         'splice_acceptor_variant' => 2, # A splice variant that changes the 2 base region at the 3' end of an intron
         'stop_gained' => 3, # A sequence variant whereby at least one base of a codon is changed, resulting in a premature stop codon, leading to a shortened transcript
         'frameshift_variant' => 3, # A sequence variant which causes a disruption of the translational reading frame, because the number of nucleotides inserted or deleted is not a multiple of three
         'stop_lost' => 3, # A sequence variant where at least one base of the terminator codon (stop) is changed, resulting in an elongated transcript
+        'inversion' =>3, # Inversion of a large chromosome segment (over 1% or 1,000,000 bases).
+        'duplication' =>3, # Duplication of an exon.
+        'duplication' =>4, # Duplication of a large chromosome segment (over 1% or 1,000,000 bases)
+        'duplication' =>4, # Duplication of a gene.
+        'initiator_codon_variant+non_canonical_start_codon' =>4, # 
+        'rearranged_at_DNA_level' =>4, # Rearrangement affecting one or more genes.
         'start_lost' => 4, # A codon variant that changes at least one base of the canonical start codon
         'initiator_codon_variant' => 4, # A codon variant that changes at least one base of the first codon of a transcript
         'disruptive_inframe_insertion' => 5, # An inframe increase in cds length that inserts one or more codons into the coding sequence within an existing codon
@@ -53,6 +67,12 @@ sub GetEffectPriority {
         'conservative_missense_variant' => 6, # A sequence variant whereby at least one base of a codon is changed resulting in a codon that encodes for a different but similar amino acid. These variants may or may not be deleterious
         'rare_amino_acid_variant' => 6, # A sequence variant whereby at least one base of a codon encoding a rare amino acid is changed, resulting in a different encoded amino acid
         'transcript_amplification' => 7, # A feature amplification of a region containing a transcript
+        '5_prime_UTR_truncation + exon_loss_variant' =>7, # The variant deletes an exon which is in the 5'UTR of the transcript
+        'protein_altering_variant' =>7, # A sequence_variant which is predicted to change the protein encoded in the coding sequence.
+        'protein_protein_contact' =>8, # Protein-Protein interaction loci.
+        '3_prime_UTR_truncation + exon_loss' =>8, # The variant deletes an exon which is in the 3'UTR of the transcript
+        'structural_interaction_variant' =>8, # Within protein interaction loci (e.g. two AA that are in contact within the same protein, possibly helping structural conformation).
+        'splice_branch_variant' =>8, #
         'splice_region_variant' => 8, # A sequence variant in which a change has occurred within the region of the splice site, either within 1-3 bases of the exon or 3-8 bases of the intron
         'splice_donor_5th_base_variant' => 8, # A sequence variant that causes a change at the 5th base pair after the start of the intron in the orientation of the transcript
         'splice_donor_region_variant' => 8, # A sequence variant that falls in the region between the 3rd and 6th base after splice junction (5' end of intron)
@@ -60,10 +80,12 @@ sub GetEffectPriority {
         'start_retained_variant' => 9, # A sequence variant where at least one base in the start codon is changed, but the start remains
         'stop_retained_variant' => 9, # A sequence variant where at least one base in the terminator codon is changed, but the terminator remains
         'synonymous_variant' => 9, # A sequence variant where there is no resulting change to the encoded amino acid
+        'start_retained' =>9, # Variant causes start codon to be mutated into another start codon. e.g.: Ttg/Ctg, L/L (TTG and CTG can be START codons)
         'incomplete_terminal_codon_variant' => 10, # A sequence variant where at least one base of the final codon of an incompletely annotated transcript is changed
         'coding_sequence_variant' => 11, # A sequence variant that changes the coding sequence
         'mature_miRNA_variant' => 11, # A transcript variant located with the sequence of the mature miRNA
         'exon_variant' => 11, # A sequence variant that changes exon sequence
+        'transcript_variant' =>11, # The variant hits a transcript.
         '5_prime_UTR_variant' => 12, # A UTR variant of the 5' UTR
         '5_prime_UTR_premature_start_codon_gain_variant' => 12, # snpEff-specific effect, creating a start codon in 5' UTR
         '3_prime_UTR_variant' => 12, # A UTR variant of the 3' UTR
@@ -75,6 +97,7 @@ sub GetEffectPriority {
         'intragenic_variant' => 14, # A variant that occurs within a gene but falls outside of all transcript features. This occurs when alternate transcripts of a gene do not share overlapping sequence
         'INTRAGENIC' => 14, # snpEff-specific synonym of intragenic_variant
         'NMD_transcript_variant' => 15, # A variant in a transcript that is the target of NMD
+        'coding_transcript_variant' =>15, # A transcript variant of a protein coding gene.
         'upstream_gene_variant' => 16, # A sequence variant located 5' of a gene
         'downstream_gene_variant' => 16, # A sequence variant located 3' of a gene
         'TFBS_ablation' => 17, # A feature ablation whereby the deleted region includes a transcription factor binding site
@@ -84,11 +107,18 @@ sub GetEffectPriority {
         'regulatory_region_amplification' => 17, # A feature amplification of a region containing a regulatory region
         'regulatory_region_variant' => 17, # A sequence variant located within a regulatory region
         'regulatory_region' =>17, # snpEff-specific effect that should really be regulatory_region_variant
+        'mature_miRNA_variant' =>17, # 
+        'miRNA' =>17, # Variant affects an miRNA
         'feature_elongation' => 18, # A sequence variant that causes the extension of a genomic feature, with regard to the reference sequence
         'feature_truncation' => 18, # A sequence variant that causes the reduction of a genomic feature, with regard to the reference sequence
         'intergenic_variant' => 19, # A sequence variant located in the intergenic region, between genes
         'intergenic_region' => 19, # snpEff-specific effect that should really be intergenic_variant
-        '' => 20
+        'sequence_feature' =>19, # Any extent of continuous biological sequence.
+        'conserved_intron_variant' =>19, # The variant is in a highly conserved intronic region
+        'conserved_intergenic_variant' =>20, # The variant is in a highly conserved intergenic region 
+        'gene_variant' =>19, # The variant hits a gene.
+        'custom' =>20,
+        '' => 20,
     );
     unless( defined $effectPriority{$effect} ) {
         warn "WARNING: Unrecognized effect \"$effect\". Assigning lowest priority!\n";
