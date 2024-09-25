@@ -41,7 +41,6 @@ sub GetEffectPriority {
         'bidirectional_gene_fusion' =>2, # Fusion of two genes in opposite directions.
         'duplication' =>2, # Duplication affecting part of an exon.
         'gene_fusion' =>2, # Fusion of two genes.
-        'gene_fusion' =>2, # Fusion of one gene and an intergenic region.
         'inversion' =>2, # Inversion of an exon.
         'splice_donor_variant' => 2, # A splice variant that changes the 2 base region at the 5' end of an intron
         'splice_acceptor_variant' => 2, # A splice variant that changes the 2 base region at the 3' end of an intron
@@ -49,9 +48,6 @@ sub GetEffectPriority {
         'frameshift_variant' => 3, # A sequence variant which causes a disruption of the translational reading frame, because the number of nucleotides inserted or deleted is not a multiple of three
         'stop_lost' => 3, # A sequence variant where at least one base of the terminator codon (stop) is changed, resulting in an elongated transcript
         'inversion' =>3, # Inversion of a large chromosome segment (over 1% or 1,000,000 bases).
-        'duplication' =>3, # Duplication of an exon.
-        'duplication' =>4, # Duplication of a large chromosome segment (over 1% or 1,000,000 bases)
-        'duplication' =>4, # Duplication of a gene.
         'initiator_codon_variant+non_canonical_start_codon' =>4, # 
         'rearranged_at_DNA_level' =>4, # Rearrangement affecting one or more genes.
         'start_lost' => 4, # A codon variant that changes at least one base of the canonical start codon
