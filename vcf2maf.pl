@@ -553,7 +553,13 @@ my @ann_cols = qw( Allele Gene Feature Feature_type Consequence cDNA_position CD
 
 # push any requested custom VEP annotations from the CSQ/ANN section into @ann_cols
 if ($retain_ann) {
-    push @ann_cols, split(',',$retain_ann);
+    my @extra_ann = split(',',$retain_ann);
+    for my $ann (@extra_ann) {
+        # make sure not to add duplicates to @ann_cols
+        if ( !($ann ~~ @ann_cols) ) {
+            push @ann_cols, $ann;
+        }
+    }
 }
 
 my @ann_cols_format; # To store the actual order of VEP data, that may differ between runs
