@@ -359,10 +359,18 @@ while( my $line = $orig_vcf_fh->getline ) {
             $cols[7]=~s/CT=([35]to[35])/Frame=$1/;
             $cols[7]=~s/SVMETHOD=([\w.]+)/Method=$1/;
             $cols[4] = "<" . $info{SVTYPE} . ">";
+            # if no separate chromosome for the breakpoint end is specified, use the same as for
+            # the breakpoint start (the VCF specification does not mention an INFO/CHR2 field)
+            my $chr2;
+            if (exists $info{CHR2}) {
+                $chr2 = $info{CHR2};
+            } else {
+                $chr2 = $cols[0];
+            }
             # Fetch the REF allele at the second breakpoint using samtools faidx
-            my $ref2 = `'$samtools' faidx '$ref_fasta' $info{CHR2}:$info{END}-$info{END} | grep -v ^\\>`;
+            my $ref2 = `'$samtools' faidx '$ref_fasta' $chr2:$info{END}-$info{END} | grep -v ^\\>`;
             chomp( $ref2 );
-            $split_vcf_fh->print( join( "\t", $info{CHR2}, $info{END}, $cols[2], ( $ref2 ? $ref2 : $cols[3] ), @cols[4..$#cols] ), "\n" );
+            $split_vcf_fh->print( join( "\t", $chr2, $info{END}, $cols[2], ( $ref2 ? $ref2 : $cols[3] ), @cols[4..$#cols] ), "\n" );
             $split_vcf_fh->print( join( "\t", @cols ), "\n" );
         }
         $input_vcf = "$tmp_dir/$input_name.split.vcf";
