@@ -1,6 +1,9 @@
 vcf<img src="https://i.giphy.com/R6X7GehJWQYms.gif" width="28">maf
 =======
 
+> [!WARNING]
+> This repo has been in a maintenance-only phase for many years now and will be archived in **Dec 2026**. Please consider switching to [mafsmith](https://github.com/nf-osi/mafsmith) instead which uses [fastVEP](https://github.com/Huang-lab/fastVEP) under the hood.
+
 To convert a [VCF](https://samtools.github.io/hts-specs//) into a [MAF](https://docs.gdc.cancer.gov/Data/File_Formats/MAF_Format), each variant must be mapped to only one of all possible gene transcripts/isoforms that it might affect. But even within a single isoform, a `Missense_Mutation` close enough to a `Splice_Site`, can be labeled as either in MAF format, but not as both. **This selection of a single effect per variant, is often subjective. And that's what this project attempts to standardize.** The `vcf2maf` and `maf2maf` scripts leave most of that responsibility to [Ensembl's VEP](http://ensembl.org/info/docs/tools/vep/index.html), but allows you to override their "canonical" isoforms, or use a custom ExAC VCF for annotation. Though the most useful feature is the **extensive support in parsing a wide range of crappy MAF-like or VCF-like formats** we've seen out in the wild.
 
 Quick start
