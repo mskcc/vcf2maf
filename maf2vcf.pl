@@ -100,9 +100,19 @@ $maf_fh->close;
 
 # samtools runs faster when passed many loci at a time, but limited to around 125k args at least on
 # CentOS6. If there are too many loci, let's split them into smaller chunks and run separately
+# Also, sort keys to ensure deterministic behavior (keys %hash returns random order)
 my ( @regions_split, $lines );
-my @regions = keys %uniq_regions;
-push( @regions_split, [ splice( @regions, 0, 5000 ) ] ) while @regions;
+
+# Read the .fai index to get valid chromosome names
+my $ref_fai = $ref_fasta . ".fai";
+`'$samtools' faidx '$ref_fasta'` unless( -s $ref_fai );
+my %valid_chroms = map{ chomp; my ($chr)=split("\t"); ($chr, 1) } `cut -f1 '$ref_fai'`;
+
+# Filter out regions with invalid chromosomes to prevent samtools from stopping on errors
+my @regions = sort keys %uniq_regions;
+my @valid_regions = grep{ my ($chr) = split(/:/, $_); exists $valid_chroms{$chr} } @regions;
+
+push( @regions_split, [ splice( @valid_regions, 0, 5000 ) ] ) while @valid_regions;
 map{ my $loci = join( " ", @{$_} ); $lines .= `'$samtools' faidx '$ref_fasta' $loci` } @regions_split;
 foreach my $line ( grep( length, split( ">", $lines ))) {
     # Carefully split this FASTA entry, properly chomping newlines for long indels
@@ -118,8 +128,7 @@ foreach my $line ( grep( length, split( ">", $lines ))) {
 ( %flanking_bps ) or die "ERROR: Make sure that ref-fasta is the same genome build as your MAF: $ref_fasta\n";
 
 # Create VCF header lines for the reference FASTA, its contigs, and their lengths
-my $ref_fai = $ref_fasta . ".fai";
-`'$samtools' faidx '$ref_fasta'` unless( -s $ref_fai );
+# $ref_fai already created above, no need to recreate
 my @ref_contigs = map { chomp; my ($chr, $len)=split("\t"); "##contig=<ID=$chr,length=$len>\n" } `cut -f1,2 '$ref_fai' | sort -k1,1V`;
 my $ref_header = "##reference=file://$ref_fasta\n" . join( "", @ref_contigs );
 
