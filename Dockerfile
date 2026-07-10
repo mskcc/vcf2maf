@@ -33,6 +33,10 @@ RUN conda create -y -p /usr/local && \
     samtools==${SAMTOOLS_VERSION} \
     ucsc-liftover==${LIFTOVER_VERSION}
 
+#PATCH - fixes crash due to RAM overflow
+RUN sed -i '30d' /usr/local/share/ensembl-vep-114.0-0/vep && \
+    chmod 755 /usr/local/share/ensembl-vep-114.0-0/vep
+
 # Deploy the minimal OS and tools into a clean target layer
 FROM scratch
 
