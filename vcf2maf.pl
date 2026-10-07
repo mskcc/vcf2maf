@@ -851,6 +851,12 @@ while( my $line = $annotated_vcf_fh->getline ) {
             map { $effect{$af_col{$_}} = $effect{$_} if( defined $effect{$_} )} keys %af_col;
 
             # If VEP couldn't find this variant in dbSNP/COSMIC/etc., we'll say it's "novel"
+            # before we set it as novel we try to fall back to the rsID in the VCF ID column
+            if ( !defined $effect{Existing_variation} || $effect{Existing_variation} eq "" || $effect{Existing_variation} eq "." ) {
+                $effect{Existing_variation} = join( ",", grep { /^rs\d+$/ } split( /[;,]/, ( defined $var_id ? $var_id : "" )));
+            }
+
+
             if( $effect{Existing_variation} ) {
                 # ::NOTE:: If seen in a DB other than dbSNP, this field will remain blank
                 $effect{dbSNP_RS} = join( ",", grep{m/^rs\d+$/} split( /,/, $effect{Existing_variation} ));
